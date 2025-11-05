@@ -1,23 +1,28 @@
-import * as React from "react"
-import Svg, { Path } from "react-native-svg"
 
-const ChevronDownIcon = (props: any) => (
-  <Svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={16}
-    height={16}
+interface ChevronDownIconProps {
+  width?: number;
+  height?: number;
+  color?: string;
+  className?: string;
+}
+
+const ChevronDownIcon = ({ width = 16, height = 16, color = "#fff", className }: ChevronDownIconProps) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 16 16"
     fill="none"
-    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
   >
-    <Path
-      stroke="#fff"
+    <path
+      d="M4 6l4 4 4-4"
+      stroke={color}
+      strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeWidth={2}
-      d="M4 6l4 4 4-4"
     />
-  </Svg>
+  </svg>
 )
 
 export default ChevronDownIcon
-

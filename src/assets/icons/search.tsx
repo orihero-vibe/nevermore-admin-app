@@ -1,28 +1,29 @@
-interface EditIconProps {
+
+interface SearchIconProps {
   width?: number;
   height?: number;
   color?: string;
   className?: string;
 }
 
-const EditIcon = ({ width = 24, height = 24, color = "#fff", className }: EditIconProps) => (
+const SearchIcon = ({ width = 20, height = 20, color = "#8F8F8F", className }: SearchIconProps) => (
   <svg
     width={width}
     height={height}
-    viewBox="0 0 24 24"
+    viewBox="0 0 20 20"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
     <path
-      d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+      d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16Z"
       stroke={color}
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z"
+      d="m18 18-3.5-3.5"
       stroke={color}
       strokeWidth={1.5}
       strokeLinecap="round"
@@ -31,5 +32,5 @@ const EditIcon = ({ width = 24, height = 24, color = "#fff", className }: EditIc
   </svg>
 )
 
-export default EditIcon
+export default SearchIcon
 

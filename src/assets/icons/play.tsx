@@ -1,17 +1,27 @@
 import * as React from "react"
-import Svg, { SvgProps, Path } from "react-native-svg"
-const PlayIcon = (props: SvgProps) => (
-  <Svg
-    width={props.width || 36}
-    height={props.height || 36}
-    viewBox="0 0 36 36"
+
+interface PlayIconProps {
+  width?: number;
+  height?: number;
+  color?: string;
+  className?: string;
+}
+
+const PlayIcon = ({ width = 32, height = 32, color = "#fff", className }: PlayIconProps) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 32 32"
     fill="none"
-    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
   >
-    <Path
-      fill={props.color || "#fff"}
-      d="M29.064 18.625 13.165 29.224A.75.75 0 0 1 12 28.6V7.402a.75.75 0 0 1 1.165-.624l15.899 10.599a.75.75 0 0 1 0 1.248Z"
+    <path
+      d="M12 8L24 16L12 24V8Z"
+      fill={color}
     />
-  </Svg>
+  </svg>
 )
+
 export default PlayIcon
+

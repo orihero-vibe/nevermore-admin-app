@@ -1,13 +1,13 @@
 import * as React from "react"
 
-interface ChevronLeftIconProps {
+interface CloseIconProps {
   width?: number;
   height?: number;
   color?: string;
   className?: string;
 }
 
-const ChevronLeftIcon = ({ width = 24, height = 24, color = "#fff", className }: ChevronLeftIconProps) => (
+const CloseIcon = ({ width = 24, height = 24, color = "#8f8f8f", className }: CloseIconProps) => (
   <svg
     width={width}
     height={height}
@@ -17,7 +17,7 @@ const ChevronLeftIcon = ({ width = 24, height = 24, color = "#fff", className }:
     className={className}
   >
     <path
-      d="M15 18l-6-6 6-6"
+      d="M18 6L6 18M6 6L18 18"
       stroke={color}
       strokeWidth={2}
       strokeLinecap="round"
@@ -26,4 +26,5 @@ const ChevronLeftIcon = ({ width = 24, height = 24, color = "#fff", className }:
   </svg>
 )
 
-export default ChevronLeftIcon
+export default CloseIcon
+

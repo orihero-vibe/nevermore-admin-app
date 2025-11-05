@@ -1,46 +1,99 @@
-import { Link, useLocation } from 'react-router-dom';
-import { useStore } from '../store';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { UserProfile } from './UserProfile';
+import ContentManagementIcon from '../assets/icons/content-management';
+import SettingsIcon from '../assets/icons/settings';
+import SignOutIcon from '../assets/icons/sign-out';
 
 const navigationItems = [
-  { path: '/dashboard', name: 'Dashboard', icon: '📊' },
-  { path: '/users', name: 'Users', icon: '👥' },
-  { path: '/settings', name: 'Settings', icon: '⚙️' },
+  {
+    path: '/content-management',
+    name: 'Content Management',
+    icon: ContentManagementIcon,
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    icon: SettingsIcon,
+  },
 ];
 
 export const Sidebar = () => {
   const location = useLocation();
-  const sidebarOpen = useStore((state) => state.sidebarOpen);
+  const navigate = useNavigate();
+
+  const handleSignOut = () => {
+    // TODO: Clear any auth state/tokens if needed
+    navigate('/signin');
+  };
 
   return (
-    <div
-      className={`bg-gray-900 text-white min-h-screen transition-all duration-300 ${
-        sidebarOpen ? 'w-64' : 'w-16'
-      }`}
-    >
-      <div className="p-4 border-b border-gray-800">
-        <h1 className={`font-bold text-xl truncate ${!sidebarOpen && 'hidden'}`}>
-          Nevermore Admin
-        </h1>
+    <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] text-white min-h-screen w-[248px] flex flex-col px-6 py-8">
+      {/* User Profile Section */}
+      <div className="mb-20">
+        <UserProfile name="Admin" />
       </div>
-      
-      <nav className="mt-4">
+
+      {/* Navigation Menu */}
+      <nav className="flex-1 flex flex-col gap-2">
         {navigationItems.map((item) => {
           const isActive = location.pathname === item.path;
+          const IconComponent = item.icon;
+
           return (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center px-4 py-3 transition hover:bg-gray-800 ${
-                isActive ? 'bg-gray-800 border-l-4 border-blue-500' : ''
+              className={`flex items-center gap-3 p-4 rounded-[16px] transition ${
+                isActive
+                  ? 'backdrop-blur-[25px] bg-[rgba(255,255,255,0.1)] text-white'
+                  : 'text-[#8f8f8f] hover:text-white hover:bg-[rgba(255,255,255,0.05)]'
               }`}
             >
-              <span className="text-xl mr-3">{item.icon}</span>
-              {sidebarOpen && <span className="truncate">{item.name}</span>}
+              <IconComponent
+                width={24}
+                height={24}
+                color={isActive ? '#fff' : '#8f8f8f'}
+              />
+              <span className="font-teachers font-medium text-[16px] leading-[16px]">
+                {item.name}
+              </span>
             </Link>
           );
         })}
+
+        {/* Sign Out Button */}
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 p-4 rounded-[16px] transition text-[#8f8f8f] hover:text-white hover:bg-[rgba(255,255,255,0.05)] cursor-pointer"
+        >
+          <SignOutIcon
+            width={24}
+            height={24}
+            color="#8f8f8f"
+          />
+          <span className="font-teachers font-medium text-[16px] leading-[16px]">
+            Sign Out
+          </span>
+        </button>
       </nav>
+
+      {/* Footer Links */}
+      <div className="mt-auto pt-4 text-center">
+        <Link
+          to="/terms"
+          className="block text-[#8f8f8f] text-[12px] leading-[16px] hover:text-white transition mb-1"
+          style={{ fontFamily: 'Roboto, sans-serif' }}
+        >
+          Terms and Conditions
+        </Link>
+        <Link
+          to="/privacy"
+          className="block text-[#8f8f8f] text-[12px] leading-[16px] hover:text-white transition"
+          style={{ fontFamily: 'Roboto, sans-serif' }}
+        >
+          Privacy Policy
+        </Link>
+      </div>
     </div>
   );
 };
-

@@ -2,20 +2,18 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import authBg from '../assets/images/auth-bg.png';
 import { Input } from '../components/Input';
-import { PasswordInput } from '../components/PasswordInput';
 import { Button } from '../components/Button';
 
-export const SignIn = () => {
+export const ForgotPassword = () => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement sign in logic
-    console.log('Sign in:', { email, password });
-    // Navigate to content management page after sign in
-    navigate('/content-management');
+    // TODO: Implement password reset logic
+    console.log('Reset password for:', { email });
+    // Navigate to link sent page
+    navigate('/link-sent');
   };
 
   return (
@@ -32,47 +30,42 @@ export const SignIn = () => {
       <div className="relative z-10 w-full max-w-md mx-4">
         <div className="bg-[rgba(255, 255, 255, 0.75)] backdrop-blur-lg rounded-2xl shadow-2xl p-8 border-gray-700/50">
           {/* Title */}
-          <h1 className="text-3xl font-normal text-white mb-8 tracking-wide">
-            Sign In
+          <h1 className="text-3xl font-normal text-white mb-4 tracking-wide">
+            Reset Password
           </h1>
+
+          {/* Instructions */}
+          <p className="text-sm text-gray-200 mb-6">
+            Enter your email address to reset your password.
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Field */}
             <Input
               id="email"
               type="email"
-              label="Email"
+              label="Email Address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
+              placeholder="Enter email address"
               required
             />
 
-            {/* Password Field */}
-            <PasswordInput
-              id="password"
-              label="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password!"
-              required
-            />
-
-            {/* Forgot Password Link */}
-            <div className="flex justify-end">
-              <Link
-                to="/forgot-password"
-                className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium"
-              >
-                Forgot Password?
-              </Link>
-            </div>
-
-            {/* Sign In Button */}
+            {/* Send Link Button */}
             <Button type="submit" fullWidth>
-              Sign In
+              Send Link
             </Button>
           </form>
+
+          {/* Return to Sign In Link */}
+          <div className="mt-6 text-center">
+            <Link
+              to="/signin"
+              className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium"
+            >
+              Return to Sign In
+            </Link>
+          </div>
         </div>
       </div>
     </div>

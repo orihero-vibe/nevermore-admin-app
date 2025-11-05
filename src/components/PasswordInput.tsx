@@ -20,7 +20,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
   return (
     <div>
       {label && (
-        <label htmlFor={inputId} className="block text-gray-200 text-sm font-medium mb-2">
+        <label htmlFor={inputId} className="block text-white text-sm font-normal mb-2">
           {label}
         </label>
       )}
@@ -29,8 +29,8 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
           id={inputId}
           type={showPassword ? 'text' : 'password'}
           className={`w-full px-4 py-3 pr-12 bg-[#131313] border ${
-            error ? 'border-red-500' : 'border-gray-700'
-          } rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition ${className}`}
+            error ? 'border-red-500' : 'border-[rgba(255,255,255,0.25)]'
+          } rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition ${className}`}
           {...props}
         />
         <button
