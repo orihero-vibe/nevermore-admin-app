@@ -1,5 +1,3 @@
-import * as React from "react"
-
 interface PlayIconProps {
   width?: number;
   height?: number;

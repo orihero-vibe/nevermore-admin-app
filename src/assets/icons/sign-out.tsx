@@ -1,5 +1,3 @@
-import * as React from "react"
-
 interface SignOutIconProps {
   width?: number;
   height?: number;

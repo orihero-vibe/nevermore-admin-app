@@ -1,5 +1,3 @@
-import * as React from "react"
-
 interface CloudUploadIconProps {
   width?: number;
   height?: number;

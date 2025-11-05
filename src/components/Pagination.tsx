@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
-import ChevronRightIcon from '../assets/icons/chevron-right';
 import ChevronDownIcon from '../assets/icons/chevron-down';
 
 export interface PaginationProps {

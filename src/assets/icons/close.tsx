@@ -1,5 +1,3 @@
-import * as React from "react"
-
 interface CloseIconProps {
   width?: number;
   height?: number;

@@ -3,7 +3,6 @@ import CloseIcon from '../assets/icons/close';
 import EyeIcon from '../assets/icons/eye';
 import EyeClosedIcon from '../assets/icons/eye-closed';
 import { Button } from './Button';
-import { Input } from './Input';
 
 interface ChangeEmailModalProps {
   isOpen: boolean;
