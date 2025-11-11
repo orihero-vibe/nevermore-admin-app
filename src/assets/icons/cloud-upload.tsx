@@ -6,36 +6,14 @@ interface CloudUploadIconProps {
 }
 
 const CloudUploadIcon = ({ width = 48, height = 48, color = "#fff", className }: CloudUploadIconProps) => (
-  <svg
-    width={width}
-    height={height}
-    viewBox="0 0 48 48"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-  >
-    <path
-      d="M32 36H16C10.48 36 6 31.52 6 26C6 20.48 10.48 16 16 16C16.96 12.8 19.76 10.4 23.2 10C24.32 6.48 27.52 4 31.2 4C36.64 4 41 8.36 41 13.8C41 14.48 40.96 15.12 40.88 15.76C43.68 17.04 45.6 19.76 45.6 22.8C45.6 26.64 42.44 29.8 38.6 29.8H32"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M24 28L24 44"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M18 34L24 28L30 34"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+  <svg color={color} width={width} height={height} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <path d="M33.2195 38.0839C35.8995 38.1039 38.4795 37.1039 40.4595 35.3039C46.9995 29.5839 43.4995 18.1039 34.8795 17.0239C31.7995 -1.65612 4.85946 5.42388 11.2395 23.2039" stroke={color} strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M14.5588 24.0237C13.4988 23.4837 12.3188 23.2037 11.1388 23.2237C1.81875 23.8837 1.83875 37.4437 11.1388 38.1037" stroke={color} strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M31.6406 17.863C32.6806 17.343 33.8006 17.063 34.9606 17.043" stroke="white" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M24 42V28L20 32" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M24 28L28 32" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
   </svg>
+
 )
 
 export default CloudUploadIcon

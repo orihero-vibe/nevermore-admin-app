@@ -1,5 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { ProtectedRoute } from '../components/ProtectedRoute';
+import { PublicRoute } from '../components/PublicRoute';
 import { Dashboard } from '../pages/Dashboard';
 import { NotFound } from '../pages/NotFound';
 import { SignIn } from '../pages/SignIn';
@@ -15,31 +17,59 @@ import { Settings } from '../pages/Settings';
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <SignIn />,
+    element: (
+      <PublicRoute>
+        <SignIn />
+      </PublicRoute>
+    ),
   },
   {
     path: '/signin',
-    element: <SignIn />,
+    element: (
+      <PublicRoute>
+        <SignIn />
+      </PublicRoute>
+    ),
   },
   {
     path: '/forgot-password',
-    element: <ForgotPassword />,
+    element: (
+      <PublicRoute>
+        <ForgotPassword />
+      </PublicRoute>
+    ),
   },
   {
     path: '/link-sent',
-    element: <LinkSent />,
+    element: (
+      <PublicRoute>
+        <LinkSent />
+      </PublicRoute>
+    ),
   },
   {
     path: '/success',
-    element: <Success />,
+    element: (
+      <PublicRoute>
+        <Success />
+      </PublicRoute>
+    ),
   },
   {
     path: '/create-new-password',
-    element: <CreateNewPassword />,
+    element: (
+      <PublicRoute>
+        <CreateNewPassword />
+      </PublicRoute>
+    ),
   },
   {
     path: '/dashboard',
-    element: <Layout />,
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -69,7 +99,11 @@ export const router = createBrowserRouter([
   },
   {
     path: '/content-management',
-    element: <Layout />,
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -99,7 +133,11 @@ export const router = createBrowserRouter([
   },
   {
     path: '/settings',
-    element: <Layout />,
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,

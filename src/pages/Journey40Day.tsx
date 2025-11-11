@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { AudioPlayer } from '../components/AudioPlayer';
-import { FileUploadModal } from '../components/FileUploadModal';
+import { FileUploadPopup, type UploadFile } from '../components/FileUploadPopup';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
+import { publishContent } from '../lib/content';
+import { showAppwriteError } from '../lib/notifications';
 
 interface JourneyData {
   id?: string;
@@ -22,8 +24,10 @@ export const Journey40Day = () => {
   const [contentTitle, setContentTitle] = useState('');
   const [tasks, setTasks] = useState<string[]>(['', '', '', '', '']);
   const [showAudioPlayer, setShowAudioPlayer] = useState(false);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishProgress, setPublishProgress] = useState(0);
 
   // Load data when component mounts or journeyData changes
   useEffect(() => {
@@ -55,29 +59,70 @@ export const Journey40Day = () => {
   };
 
   const handleUploadFiles = () => {
-    setIsUploadModalOpen(true);
+    setIsUploadPopupOpen(true);
   };
 
-  const handleUploadComplete = (files: File[]) => {
-    // TODO: Handle uploaded files
-    console.log('Files uploaded:', files);
-    setUploadedFiles(files);
-    // Show audio player after files are uploaded
-    if (files.length > 0) {
+  const handleUploadComplete = (uploadFiles: UploadFile[]) => {
+    // Filter for audio files only
+    const audioFiles = uploadFiles
+      .filter((uf) => uf.contentType === 'audio')
+      .map((uf) => uf.file);
+    
+    if (audioFiles.length > 0) {
+      setUploadedFiles(audioFiles);
       setShowAudioPlayer(true);
       // If content title is empty, set a default from the first file
-      if (!contentTitle && files[0]) {
-        const fileName = files[0].name;
+      if (!contentTitle && audioFiles[0]) {
+        const fileName = audioFiles[0].name;
         const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
         setContentTitle(nameWithoutExt);
       }
     }
   };
 
-  const handlePublish = () => {
-    // TODO: Implement publish logic
-    console.log('Publishing journey:', { contentTitle, tasks });
-    navigate('/content-management');
+  const handlePublish = async () => {
+    // Validate required fields
+    if (!contentTitle.trim()) {
+      showAppwriteError(new Error('Content title is required'));
+      return;
+    }
+
+    // Check if we have at least one file uploaded
+    if (uploadedFiles.length === 0) {
+      showAppwriteError(new Error('Please upload at least one audio file'));
+      return;
+    }
+
+    // Filter out empty tasks
+    const validTasks = tasks.filter((task) => task.trim().length > 0);
+
+    setIsPublishing(true);
+    setPublishProgress(0);
+
+    try {
+      // Publish content (uploads files and creates content document)
+      await publishContent(
+        {
+          title: contentTitle,
+          type: 'forty_day_journey', // Must be one of: forty_day_journey, forty_temptations
+        },
+        [], // No images for journey
+        uploadedFiles, // Audio files
+        null, // No transcript
+        validTasks.length > 0 ? validTasks : undefined, // Tasks array
+        (progress) => {
+          setPublishProgress(progress);
+        }
+      );
+
+      // Navigate back to content management after successful publish
+      navigate('/content-management');
+    } catch (error) {
+      console.error('Error publishing content:', error);
+      // Error is already shown by publishContent function
+      setIsPublishing(false);
+      setPublishProgress(0);
+    }
   };
 
   const handleCancel = () => {
@@ -199,27 +244,43 @@ export const Journey40Day = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-4 items-center">
-          <Button
-            onClick={handlePublish}
-            className="w-[120px] h-[56px] rounded-[12px]"
-          >
-            Publish
-          </Button>
+        <div className="flex gap-4 items-center justify-end w-full">
           <button
             onClick={handleCancel}
-            className="w-[120px] h-[56px] rounded-[12px] border border-[#965cdf] text-white font-roboto font-medium text-[16px] leading-normal hover:bg-[rgba(150,92,223,0.1)] transition-colors"
+            disabled={isPublishing}
+            className="w-[120px] h-[56px] rounded-[12px] border border-[#965cdf] text-white font-roboto font-medium text-[16px] leading-normal hover:bg-[rgba(150,92,223,0.1)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
+          <Button
+            onClick={handlePublish}
+            className="w-[120px] h-[56px] rounded-[12px]"
+            disabled={isPublishing}
+          >
+            {isPublishing ? `Publishing... ${publishProgress}%` : 'Publish'}
+          </Button>
+          {isPublishing && publishProgress > 0 && publishProgress < 100 && (
+            <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+              <div
+                className="bg-[#965cdf] h-full transition-all duration-300"
+                style={{ width: `${publishProgress}%` }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* File Upload Modal */}
-      <FileUploadModal
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        onUploadComplete={handleUploadComplete}
+      {/* File Upload Popup */}
+      <FileUploadPopup
+        isOpen={isUploadPopupOpen}
+        onClose={() => setIsUploadPopupOpen(false)}
+        onUpload={handleUploadComplete}
+        accept="audio/*"
+        title="Upload Audio"
+        supportedFormats="MP3, WAV, M4A, AAC, OGG, FLAC"
+        contentTypes={[
+          { value: 'audio', label: 'Audio' },
+        ]}
       />
     </div>
   );

@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import authBg from '../assets/images/auth-bg.png';
 import { PasswordInput } from '../components/PasswordInput';
 import { Button } from '../components/Button';
 import CheckSmallIcon from '../assets/icons/check-small';
+import { updatePasswordRecovery } from '../lib/auth';
 
 interface ValidationRule {
   id: string;
@@ -12,6 +13,11 @@ interface ValidationRule {
 }
 
 const validationRules: ValidationRule[] = [
+  {
+    id: 'length',
+    label: 'At least 8 characters',
+    validate: (password) => password.length >= 8,
+  },
   {
     id: 'capital',
     label: 'At least 1 capital letter',
@@ -37,10 +43,25 @@ const validationRules: ValidationRule[] = [
 export const CreateNewPassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Extract userId and secret from URL query parameters
+  const userId = searchParams.get('userId');
+  const secret = searchParams.get('secret');
+
+  // Check if required parameters are present
+  useEffect(() => {
+    if (!userId || !secret) {
+      setError('Invalid or expired recovery link. Please request a new password reset.');
+    }
+  }, [userId, secret]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     
     // Check if all validations pass
     const allValid = validationRules.every((rule) =>
@@ -48,13 +69,37 @@ export const CreateNewPassword = () => {
     );
 
     if (!allValid) {
+      setError('Please ensure all password requirements are met.');
       return;
     }
 
-    // TODO: Implement password reset logic
-    console.log('Password reset:', { newPassword, confirmPassword });
-    // Navigate to sign in page after successful password reset
-    navigate('/signin');
+    if (!userId || !secret) {
+      setError('Invalid or expired recovery link. Please request a new password reset.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await updatePasswordRecovery(userId, secret, newPassword);
+      // Navigate to sign in page after successful password reset
+      navigate('/signin', { 
+        state: { 
+          message: 'Password reset successful. Please sign in with your new password.' 
+        } 
+      });
+    } catch (error: unknown) {
+      // Get error message directly from Appwrite error
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string')
+        ? error.message
+        : (typeof error === 'string')
+        ? error
+        : 'Failed to update password. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getValidationStatus = (rule: ValidationRule) => {
@@ -81,15 +126,26 @@ export const CreateNewPassword = () => {
             </h1>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
+
               {/* New Password Field */}
               <div className="flex flex-col gap-2">
                 <PasswordInput
                   id="new-password"
                   label="New Password"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setError(''); // Clear error when user types
+                  }}
                   placeholder="Enter new password"
                   required
+                  disabled={isLoading || !userId || !secret}
                 />
               </div>
 
@@ -99,9 +155,13 @@ export const CreateNewPassword = () => {
                   id="confirm-password"
                   label="Re-enter Password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setError(''); // Clear error when user types
+                  }}
                   placeholder="Re-enter password"
                   required
+                  disabled={isLoading || !userId || !secret}
                 />
               </div>
 
@@ -133,10 +193,22 @@ export const CreateNewPassword = () => {
               </div>
 
               {/* Submit Button */}
-              <Button type="submit" fullWidth>
-                Submit
+              <Button type="submit" fullWidth disabled={isLoading || !userId || !secret}>
+                {isLoading ? 'Updating Password...' : 'Submit'}
               </Button>
             </form>
+
+            {/* Link to request new recovery if invalid */}
+            {(!userId || !secret) && (
+              <div className="mt-4 text-center">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium"
+                >
+                  Request a new password reset link
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

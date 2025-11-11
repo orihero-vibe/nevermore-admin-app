@@ -3,6 +3,8 @@ import { UserProfile } from './UserProfile';
 import ContentManagementIcon from '../assets/icons/content-management';
 import SettingsIcon from '../assets/icons/settings';
 import SignOutIcon from '../assets/icons/sign-out';
+import { useStore } from '../store';
+import { showSuccess } from '../lib/notifications';
 
 const navigationItems = [
   {
@@ -20,17 +22,25 @@ const navigationItems = [
 export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut, isLoading, user } = useStore();
 
-  const handleSignOut = () => {
-    // TODO: Clear any auth state/tokens if needed
-    navigate('/signin');
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      showSuccess('Signed out successfully');
+      navigate('/signin', { replace: true });
+    } catch (error) {
+      // Error is already handled in the store and shown via notifications
+      // Still navigate to signin even if sign out fails
+      navigate('/signin', { replace: true });
+    }
   };
 
   return (
     <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] text-white min-h-screen w-[248px] flex flex-col px-6 py-8">
       {/* User Profile Section */}
       <div className="mb-20">
-        <UserProfile name="Admin" />
+        <UserProfile name={user?.name || user?.email || 'Admin'} />
       </div>
 
       {/* Navigation Menu */}
@@ -64,7 +74,8 @@ export const Sidebar = () => {
         {/* Sign Out Button */}
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 p-4 rounded-[16px] transition text-[#8f8f8f] hover:text-white hover:bg-[rgba(255,255,255,0.05)] cursor-pointer"
+          disabled={isLoading}
+          className="flex items-center gap-3 p-4 rounded-[16px] transition text-[#8f8f8f] hover:text-white hover:bg-[rgba(255,255,255,0.05)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <SignOutIcon
             width={24}
@@ -72,7 +83,7 @@ export const Sidebar = () => {
             color="#8f8f8f"
           />
           <span className="font-teachers font-medium text-[16px] leading-[16px]">
-            Sign Out
+            {isLoading ? 'Signing Out...' : 'Sign Out'}
           </span>
         </button>
       </nav>

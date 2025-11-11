@@ -3,17 +3,41 @@ import { Link, useNavigate } from 'react-router-dom';
 import authBg from '../assets/images/auth-bg.png';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
+import { createPasswordRecovery } from '../lib/auth';
 
 export const ForgotPassword = () => {
   const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement password reset logic
-    console.log('Reset password for:', { email });
-    // Navigate to link sent page
-    navigate('/link-sent');
+    setError('');
+    
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await createPasswordRecovery(email);
+      // Navigate to link sent page with email in state
+      navigate('/link-sent', { state: { email } });
+    } catch (error: unknown) {
+      // Get error message directly from Appwrite error
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string')
+        ? error.message
+        : (typeof error === 'string')
+        ? error
+        : 'Failed to send recovery email. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -40,20 +64,31 @@ export const ForgotPassword = () => {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
             {/* Email Field */}
             <Input
               id="email"
               type="email"
               label="Email Address"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(''); // Clear error when user types
+              }}
               placeholder="Enter email address"
               required
+              disabled={isLoading}
             />
 
             {/* Send Link Button */}
-            <Button type="submit" fullWidth>
-              Send Link
+            <Button type="submit" fullWidth disabled={isLoading}>
+              {isLoading ? 'Sending...' : 'Send Link'}
             </Button>
           </form>
 

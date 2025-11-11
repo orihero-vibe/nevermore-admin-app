@@ -4,6 +4,7 @@ import CloseIcon from '../assets/icons/close';
 import { Select } from './Select';
 import type { SelectOption } from './Select';
 import { Button } from './Button';
+import { showWarning } from '../lib/notifications';
 
 export interface UploadFile {
   id: string;
@@ -17,7 +18,7 @@ export interface FileUploadPopupProps {
   onClose: () => void;
   onUpload: (files: UploadFile[]) => void | Promise<void>;
   accept?: string;
-  contentTypes?: SelectOption[];
+  contentTypes: SelectOption[];
   maxFiles?: number;
   title?: string;
   supportedFormats?: string;
@@ -28,7 +29,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
   onClose,
   onUpload,
   accept = '*',
-  contentTypes = [],
+  contentTypes,
   maxFiles,
   title = 'Upload',
   supportedFormats = 'JPEG, PNG, GIF, MP4, PDF, PSD, AI, Word, PPT',
@@ -83,13 +84,108 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
     }
   };
 
+  /**
+   * Detects the file type and returns the appropriate content type
+   */
+  const detectContentType = (file: File): string => {
+    const fileName = file.name.toLowerCase();
+    const fileType = file.type.toLowerCase();
+
+    // Check for image files
+    if (
+      fileType.startsWith('image/') ||
+      fileName.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg|ico)$/i)
+    ) {
+      return 'image';
+    }
+
+    // Check for audio files
+    if (
+      fileType.startsWith('audio/') ||
+      fileName.match(/\.(mp3|wav|m4a|aac|ogg|flac|wma|opus)$/i)
+    ) {
+      return 'audio';
+    }
+
+    // Check for document/transcript files
+    if (
+      fileType.includes('pdf') ||
+      fileType.includes('document') ||
+      fileType.includes('msword') ||
+      fileType.includes('wordprocessingml') ||
+      fileType.includes('presentation') ||
+      fileType.includes('powerpoint') ||
+      fileName.match(/\.(pdf|doc|docx|txt|psd|ai|ppt|pptx|rtf|odt)$/i)
+    ) {
+      return 'transcript';
+    }
+
+    // Default to first content type if available, otherwise empty
+    return contentTypes.length > 0 ? contentTypes[0].value : '';
+  };
+
   const addFiles = (files: File[]) => {
-    const newFiles: UploadFile[] = files.map((file) => ({
-      id: `${Date.now()}-${Math.random()}`,
-      file,
-      progress: 0,
-      contentType: contentTypes.length > 0 ? contentTypes[0].value : '',
-    }));
+    // Check if there's already a transcript file
+    const hasExistingTranscript = uploadFiles.some(
+      (uf) => uf.contentType === 'transcript'
+    );
+
+    // Separate files into transcript and non-transcript
+    const transcriptFiles: File[] = [];
+    const otherFiles: File[] = [];
+    let discardedCount = 0;
+
+    files.forEach((file) => {
+      const detectedType = detectContentType(file);
+      if (detectedType === 'transcript') {
+        transcriptFiles.push(file);
+      } else {
+        otherFiles.push(file);
+      }
+    });
+
+    // Handle transcript files - only allow one
+    let transcriptToAdd: File | null = null;
+    if (transcriptFiles.length > 0) {
+      if (hasExistingTranscript) {
+        // Already have a transcript, discard all new transcript files
+        discardedCount = transcriptFiles.length;
+      } else {
+        // Take only the first transcript file
+        transcriptToAdd = transcriptFiles[0];
+        discardedCount = transcriptFiles.length - 1;
+      }
+    }
+
+    // Show warning if files were discarded
+    if (discardedCount > 0) {
+      showWarning(
+        `${discardedCount} transcript file(s) discarded. Only one transcript file is allowed.`
+      );
+    }
+
+    // Create UploadFile objects with auto-detected content types
+    const newFiles: UploadFile[] = [];
+
+    // Add the single transcript file if allowed
+    if (transcriptToAdd) {
+      newFiles.push({
+        id: `${Date.now()}-${Math.random()}`,
+        file: transcriptToAdd,
+        progress: 0,
+        contentType: 'transcript',
+      });
+    }
+
+    // Add other files with their detected content types
+    otherFiles.forEach((file) => {
+      newFiles.push({
+        id: `${Date.now()}-${Math.random()}`,
+        file,
+        progress: 0,
+        contentType: detectContentType(file),
+      });
+    });
 
     setUploadFiles((prev) => {
       const updated = [...prev, ...newFiles];
@@ -149,7 +245,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
 
       {/* Modal Content */}
       <div
-        className="relative backdrop-blur-[10px] bg-[rgba(255,255,255,0.1)] rounded-[16px] p-8 w-[551px] flex flex-col gap-6"
+        className="relative backdrop-blur-[10px] bg-[rgba(255,255,255,0.1)] rounded-[16px] p-8 w-[700px] max-w-[90vw] max-h-[90vh] flex flex-col gap-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Title */}
@@ -193,24 +289,24 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
           className="hidden"
         />
 
-        {/* Uploading Files List */}
+        {/* Uploading Files List - Scrollable */}
         {uploadFiles.length > 0 && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 overflow-y-auto overflow-x-hidden max-h-[400px] pr-2 custom-scrollbar min-h-0">
             {uploadFiles.map((uploadFile) => (
-              <div key={uploadFile.id} className="flex gap-6 items-start">
-                {/* File Info with Progress */}
-                <div className="flex-1 flex flex-col gap-2">
+              <div key={uploadFile.id} className="flex gap-6 items-start shrink-0 min-w-0">
+                {/* File Info with Progress - Fixed width */}
+                <div className="w-[380px] flex flex-col gap-2 shrink-0 min-w-0">
                   <label
                     className="text-white text-[14px] leading-[20px]"
                     style={{ fontFamily: 'Roboto, sans-serif' }}
                   >
                     Uploading
                   </label>
-                  <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-0 flex flex-col gap-3 items-start">
+                  <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-0 flex flex-col gap-3 items-start min-w-0">
                     {/* File Name and Close Button */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between w-full gap-2 min-w-0">
                       <p
-                        className="text-white text-[16px] leading-[24px] truncate"
+                        className="text-white text-[16px] leading-[24px] truncate flex-1 min-w-0"
                         style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
                         title={uploadFile.file.name}
                       >
@@ -229,7 +325,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
                       </button>
                     </div>
                     {/* Progress Bar */}
-                    <div className="bg-[rgba(255,255,255,0.07)] h-[4px] rounded-full overflow-hidden">
+                    <div className="bg-[rgba(255,255,255,0.07)] h-[4px] rounded-full overflow-hidden w-full">
                       <div
                         className="bg-[#965cdf] h-full transition-all duration-300"
                         style={{ width: `${uploadFile.progress}%` }}
@@ -238,23 +334,21 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
                   </div>
                 </div>
 
-                {/* Content Type Select */}
-                {contentTypes.length > 0 && (
-                  <div className="w-[184px] flex flex-col gap-2">
-                    <label
-                      className="text-white text-[14px] leading-[20px]"
-                      style={{ fontFamily: 'Roboto, sans-serif' }}
-                    >
-                      Content Type
-                    </label>
-                    <Select
-                      options={contentTypes}
-                      value={uploadFile.contentType}
-                      onChange={(value) => updateContentType(uploadFile.id, value)}
-                      placeholder="Select"
-                    />
-                  </div>
-                )}
+                {/* Content Type Select - Fixed width */}
+                <div className="w-[184px] flex flex-col gap-2 shrink-0">
+                  <label
+                    className="text-white text-[14px] leading-[20px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  >
+                    Content Type
+                  </label>
+                  <Select
+                    options={contentTypes}
+                    value={uploadFile.contentType}
+                    onChange={(value) => updateContentType(uploadFile.id, value)}
+                    placeholder="Select"
+                  />
+                </div>
               </div>
             ))}
           </div>

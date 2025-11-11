@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
 import ChevronDownIcon from '../assets/icons/chevron-down';
@@ -8,29 +8,15 @@ import { Select } from '../components/Select';
 import type { SelectOption } from '../components/Select';
 import { Button } from '../components/Button';
 import { AudioPlayer } from '../components/AudioPlayer';
-
-const categoryOptions: SelectOption[] = [
-  { value: '', label: 'Select Category' },
-  { value: 'physical-health', label: 'Physical Health & Medical Avoidance' },
-  { value: 'emotional-psychological', label: 'Emotional & Psychological Triggers' },
-  { value: 'social-relationship', label: 'Social & Relationship Dynamics' },
-  { value: 'cultural-societal', label: 'Cultural & Societal Influences' },
-  { value: 'financial-lifestyle', label: 'Financial & Lifestyle Impacts' },
-];
+import { FileUploadPopup, type UploadFile } from '../components/FileUploadPopup';
+import { fetchCategories, categoriesToSelectOptions, categoriesToCategoryCards, getCategoryName, type Category } from '../lib/categories';
+import { publishContent } from '../lib/content';
+import { showAppwriteError } from '../lib/notifications';
 
 const roleOptions: SelectOption[] = [
   { value: '', label: 'Select Role' },
   { value: 'support', label: 'Support' },
   { value: 'recovery', label: 'Recovery' },
-  { value: 'prevention', label: 'Prevention' },
-];
-
-const categoryCards = [
-  'Physical Health & Medical Avoidance',
-  'Emotional & Psychological Triggers',
-  'Social & Relationship Dynamics',
-  'Cultural & Societal Influences',
-  'Financial & Lifestyle Impacts',
 ];
 
 interface TemptationData {
@@ -48,78 +34,80 @@ export const TemptationDetails = () => {
   const [contentTitle, setContentTitle] = useState('');
   const [categoryType, setCategoryType] = useState('');
   const [role, setRole] = useState('');
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<Array<{ id: string; src: string; file: File }>>([]);
   const [uploadedAudioFiles, setUploadedAudioFiles] = useState<File[]>([]);
   const [uploadedTranscript, setUploadedTranscript] = useState<File | null>(null);
   const [transcriptProgress, setTranscriptProgress] = useState(0);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isUploadingTranscript, setIsUploadingTranscript] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<SelectOption[]>([
+    { value: '', label: 'Select Category' },
+  ]);
+  const [categoryCards, setCategoryCards] = useState<string[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
+  const [uploadType, setUploadType] = useState<'audio' | 'image' | 'transcript' | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishProgress, setPublishProgress] = useState(0);
+
+  // Fetch categories from AppWrite on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      setIsLoadingCategories(true);
+      setCategoriesError(null);
+      try {
+        const fetchedCategories = await fetchCategories();
+        setCategories(fetchedCategories);
+        setCategoryOptions(categoriesToSelectOptions(fetchedCategories));
+        setCategoryCards(categoriesToCategoryCards(fetchedCategories));
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+        // Get detailed error message
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : 'Failed to load categories. Please check your AppWrite configuration.';
+        setCategoriesError(errorMessage);
+        // Keep default empty options on error
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Load data when component mounts or temptationData changes
   useEffect(() => {
-    if (temptationData) {
+    if (temptationData && categories.length > 0) {
       setContentTitle(temptationData.title || '');
       if (temptationData.category) {
-        // Map category name to category value
-        const categoryMap: Record<string, string> = {
-          'Physical Health & Medical Avoidance': 'physical-health',
-          'Emotional & Psychological Triggers': 'emotional-psychological',
-          'Social & Relationship Dynamics': 'social-relationship',
-          'Cultural & Societal Influences': 'cultural-societal',
-          'Financial & Lifestyle Impacts': 'financial-lifestyle',
-        };
-        setCategoryType(categoryMap[temptationData.category] || temptationData.category);
+        // Find category by name or ID (for backward compatibility)
+        const category = categories.find(
+          (cat) => getCategoryName(cat) === temptationData.category || cat.$id === temptationData.category
+        );
+        if (category) {
+          setCategoryType(category.$id);
+        } else {
+          // If category is already an ID, use it directly
+          setCategoryType(temptationData.category);
+        }
       }
       if (temptationData.role) {
         setRole(temptationData.role.toLowerCase());
       }
+    } else if (temptationData && categories.length === 0 && !isLoadingCategories) {
+      // If categories are loaded but not found, still set the title and role
+      setContentTitle(temptationData.title || '');
+      if (temptationData.role) {
+        setRole(temptationData.role.toLowerCase());
+      }
     }
-  }, [temptationData]);
-
-  const audioFileInputRef = useRef<HTMLInputElement>(null);
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
-  const transcriptFileInputRef = useRef<HTMLInputElement>(null);
+  }, [temptationData, categories, isLoadingCategories]);
 
   const handleBack = () => {
     navigate('/content-management');
-  };
-
-  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      setUploadedAudioFiles((prev) => [...prev, ...files]);
-    }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleTranscriptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploadedTranscript(file);
-      setIsUploadingTranscript(true);
-      setTranscriptProgress(0);
-      // Simulate upload progress
-      const interval = setInterval(() => {
-        setTranscriptProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setIsUploadingTranscript(false);
-            return 100;
-          }
-          return prev + Math.random() * 30;
-        });
-      }, 200);
-    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -131,15 +119,25 @@ export const TemptationDetails = () => {
     e.preventDefault();
     e.stopPropagation();
     
-    const file = e.dataTransfer.files[0];
-    if (file) {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
       if (type === 'image') {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setUploadedImage(reader.result as string);
-        };
-        reader.readAsDataURL(file);
+        files.forEach((file) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setUploadedImages((prev) => [
+              ...prev,
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                src: reader.result as string,
+                file,
+              },
+            ]);
+          };
+          reader.readAsDataURL(file);
+        });
       } else {
+        const file = files[0];
         setUploadedTranscript(file);
         setIsUploadingTranscript(true);
         setTranscriptProgress(0);
@@ -159,6 +157,7 @@ export const TemptationDetails = () => {
   };
 
   const toggleCategory = (category: string) => {
+    // Toggle expansion
     setExpandedCategories((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(category)) {
@@ -168,25 +167,163 @@ export const TemptationDetails = () => {
       }
       return newSet;
     });
+
+    // Also select the category in the dropdown
+    const categoryDoc = categories.find((cat) => getCategoryName(cat) === category);
+    if (categoryDoc) {
+      setCategoryType(categoryDoc.$id);
+    }
   };
 
-  const handlePublish = () => {
-    // TODO: Implement publish logic
-    console.log('Publishing content:', {
-      contentTitle,
-      categoryType,
-      role,
-      uploadedImage,
-      uploadedAudioFiles,
-      uploadedTranscript,
-    });
-    // Navigate back to content management after publish
-    navigate('/content-management');
+  const handlePublish = async () => {
+    // Validate required fields
+    if (!contentTitle.trim()) {
+      showAppwriteError(new Error('Content title is required'));
+      return;
+    }
+
+    if (!categoryType) {
+      showAppwriteError(new Error('Category is required'));
+      return;
+    }
+
+    if (!role) {
+      showAppwriteError(new Error('Role is required'));
+      return;
+    }
+
+    // Check if we have at least one file uploaded
+    if (uploadedImages.length === 0 && uploadedAudioFiles.length === 0 && !uploadedTranscript) {
+      showAppwriteError(new Error('Please upload at least one file (image, audio, or transcript)'));
+      return;
+    }
+
+    setIsPublishing(true);
+    setPublishProgress(0);
+
+    try {
+      // Extract File objects from uploaded images
+      const imageFiles = uploadedImages.map((img) => img.file);
+      
+      // Publish content (uploads files and creates content document)
+      await publishContent(
+        {
+          title: contentTitle,
+          category: categoryType,
+          role: role,
+          type: 'forty_temptations', // Must be one of: forty_day_journey, forty_temptations
+        },
+        imageFiles,
+        uploadedAudioFiles,
+        uploadedTranscript,
+        undefined, // tasks (not used for temptations)
+        (progress) => {
+          setPublishProgress(progress);
+        }
+      );
+
+      // Navigate back to content management after successful publish
+      navigate('/content-management');
+    } catch (error) {
+      console.error('Error publishing content:', error);
+      // Error is already shown by publishContent function
+      setIsPublishing(false);
+      setPublishProgress(0);
+    }
   };
 
   const handleCancel = () => {
     navigate('/content-management');
   };
+
+  const handleUploadButtonClick = (type: 'audio' | 'image' | 'transcript') => {
+    setUploadType(type);
+    setIsUploadPopupOpen(true);
+  };
+
+  const handleUploadComplete = (uploadFiles: UploadFile[]) => {
+    // Route files to their appropriate places based on content type
+    const imageFiles: File[] = [];
+    const audioFiles: File[] = [];
+    const transcriptFiles: File[] = [];
+
+    // Separate files by their content type
+    uploadFiles.forEach((uploadFile) => {
+      switch (uploadFile.contentType) {
+        case 'image':
+          imageFiles.push(uploadFile.file);
+          break;
+        case 'audio':
+          audioFiles.push(uploadFile.file);
+          break;
+        case 'transcript':
+          transcriptFiles.push(uploadFile.file);
+          break;
+      }
+    });
+
+    // Handle image files - add all to the images array
+    if (imageFiles.length > 0) {
+      imageFiles.forEach((imageFile) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setUploadedImages((prev) => [
+            ...prev,
+            {
+              id: `${Date.now()}-${Math.random()}`,
+              src: reader.result as string,
+              file: imageFile,
+            },
+          ]);
+        };
+        reader.readAsDataURL(imageFile);
+      });
+    }
+
+    // Handle audio files - add all to the audio files list
+    if (audioFiles.length > 0) {
+      setUploadedAudioFiles((prev) => [...prev, ...audioFiles]);
+    }
+
+    // Handle transcript files - take the first one (only one is allowed)
+    if (transcriptFiles.length > 0) {
+      const transcriptFile = transcriptFiles[0];
+      setUploadedTranscript(transcriptFile);
+      setIsUploadingTranscript(true);
+      setTranscriptProgress(0);
+      // Simulate upload progress
+      const interval = setInterval(() => {
+        setTranscriptProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            setIsUploadingTranscript(false);
+            return 100;
+          }
+          return prev + Math.random() * 30;
+        });
+      }, 200);
+    }
+
+    setIsUploadPopupOpen(false);
+    setUploadType(null);
+  };
+
+  const getUploadPopupConfig = () => {
+    // All upload types now accept any file type
+    return {
+      accept: '*',
+      title: 'Upload',
+      supportedFormats: 'JPEG, PNG, GIF, MP4, PDF, PSD, AI, Word, PPT',
+      maxFiles: undefined,
+    };
+  };
+
+  const handleRemoveImage = (imageId: string) => {
+    setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
+  };
+
+  // Check if any files have been uploaded
+  const hasUploadedFiles = uploadedImages.length > 0 || uploadedAudioFiles.length > 0 || uploadedTranscript !== null;
 
   return (
     <div className="bg-neutral-950 min-h-screen">
@@ -248,18 +385,10 @@ export const TemptationDetails = () => {
                 </div>
                 <Button
                   className="w-[120px] h-[56px]"
-                  onClick={() => audioFileInputRef.current?.click()}
+                  onClick={() => handleUploadButtonClick('audio')}
                 >
                   Upload Files
                 </Button>
-                <input
-                  ref={audioFileInputRef}
-                  type="file"
-                  accept="audio/*"
-                  multiple
-                  onChange={handleAudioUpload}
-                  className="hidden"
-                />
               </div>
 
               {/* Category Type and Role */}
@@ -267,12 +396,20 @@ export const TemptationDetails = () => {
                 <div className="flex-1">
                   <label className="block text-white text-[14px] leading-[20px] mb-2" style={{ fontFamily: 'Roboto, sans-serif' }}>
                     Category Type
+                    {isLoadingCategories && (
+                      <span className="text-[#8f8f8f] text-[12px] ml-2">(Loading...)</span>
+                    )}
+                    {categoriesError && (
+                      <span className="text-red-400 text-[12px] ml-2" title={categoriesError}>
+                        (Error - check console)
+                      </span>
+                    )}
                   </label>
                   <Select
                     options={categoryOptions}
                     value={categoryType}
                     onChange={setCategoryType}
-                    placeholder="Select Category"
+                    placeholder={isLoadingCategories ? 'Loading categories...' : 'Select Category'}
                   />
                 </div>
                 <div className="w-[184px]">
@@ -318,70 +455,110 @@ export const TemptationDetails = () => {
               )}
             </div>
 
-            {/* Category Cards - Positioned absolutely on the left */}
-            <div className="absolute left-[54px] top-[245px] flex flex-col gap-3 w-[342px]">
-              {categoryCards.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => toggleCategory(category)}
-                  className={`backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] px-3 py-6 flex items-center justify-between transition ${
-                    expandedCategories.has(category) ? 'bg-[rgba(255,255,255,0.1)]' : ''
-                  }`}
-                >
-                  <span
-                    className="text-white text-[14px] leading-[24px] whitespace-nowrap"
-                    style={{ fontFamily: 'Cinzel, serif', fontWeight: 550 }}
-                  >
-                    {category}
-                  </span>
-                  <div className="bg-[rgba(255,255,255,0.2)] rounded-full w-5 h-5 flex items-center justify-center shrink-0">
-                    <ChevronDownIcon
-                      width={20}
-                      height={20}
-                      color="#fff"
-                      className={`transition-transform ${
-                        expandedCategories.has(category) ? 'rotate-180' : ''
-                      }`}
-                    />
+            {/* Category Cards - Positioned absolutely on the left - Hide after file upload */}
+            {!hasUploadedFiles && (
+              <div className="absolute left-[54px] top-[245px] flex flex-col gap-3 w-[342px]">
+                {isLoadingCategories ? (
+                  <div className="text-[#8f8f8f] text-[14px] p-4" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                    Loading categories...
                   </div>
-                </button>
-              ))}
-            </div>
+                ) : categoriesError ? (
+                  <div className="text-red-400 text-[12px] p-4 whitespace-pre-line" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                    {categoriesError}
+                  </div>
+                ) : categoryCards.length > 0 ? (
+                  categoryCards.map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => toggleCategory(category)}
+                      className={`backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] px-3 py-6 flex items-center justify-between transition ${
+                        expandedCategories.has(category) ? 'bg-[rgba(255,255,255,0.1)]' : ''
+                      }`}
+                    >
+                      <span
+                        className="text-white text-[14px] leading-[24px] whitespace-nowrap"
+                        style={{ fontFamily: 'Cinzel, serif', fontWeight: 550 }}
+                      >
+                        {category}
+                      </span>
+                      <div className="bg-[rgba(255,255,255,0.2)] rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                        <ChevronDownIcon
+                          width={20}
+                          height={20}
+                          color="#fff"
+                          className={`transition-transform ${
+                            expandedCategories.has(category) ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="text-[#8f8f8f] text-[14px] p-4" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                    No categories available
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Right Column - Image and Transcript Upload */}
             <div className="w-[464px] flex flex-col gap-6">
               {/* Image Upload Section */}
               <div className="flex flex-col gap-6">
-                <div
-                  className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden"
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, 'image')}
-                >
-                  {uploadedImage ? (
-                    <img
-                      src={uploadedImage}
-                      alt="Uploaded content"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                      No image uploaded
+                {uploadedImages.length > 0 ? (
+                  <div className="flex flex-col gap-4">
+                    {/* Image Grid - Scrollable container with fixed height */}
+                    <div className="h-[364px] overflow-y-auto pr-2 custom-scrollbar">
+                      <div className="grid grid-cols-3 gap-3">
+                        {uploadedImages.map((image) => (
+                          <div
+                            key={image.id}
+                            className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] h-[110px] overflow-hidden group"
+                          >
+                            <img
+                              src={image.src}
+                              alt="Uploaded content"
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Remove Button */}
+                            <button
+                              onClick={() => handleRemoveImage(image.id)}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label="Remove image"
+                            >
+                              <CloseIcon width={16} height={16} color="#fff" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  )}
-                </div>
-                <Button
-                  className="w-full h-[56px]"
-                  onClick={() => imageFileInputRef.current?.click()}
-                >
-                  Upload Image(s)
-                </Button>
-                <input
-                  ref={imageFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
+                    <Button
+                      className="w-full h-[56px]"
+                      onClick={() => handleUploadButtonClick('image')}
+                    >
+                      Upload More Images
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#965cdf] transition-colors"
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, 'image')}
+                      onClick={() => handleUploadButtonClick('image')}
+                    >
+                      <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                        No image uploaded
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full h-[56px]"
+                      onClick={() => handleUploadButtonClick('image')}
+                    >
+                      Upload Image(s)
+                    </Button>
+                  </>
+                )}
               </div>
 
               {/* Transcript Upload Section */}
@@ -428,7 +605,7 @@ export const TemptationDetails = () => {
                     className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, 'transcript')}
-                    onClick={() => transcriptFileInputRef.current?.click()}
+                    onClick={() => handleUploadButtonClick('transcript')}
                   >
                     <CloudUploadIcon width={48} height={48} color="#fff" />
                     <div className="text-center">
@@ -448,35 +625,59 @@ export const TemptationDetails = () => {
                     </div>
                   </div>
                 )}
-                <input
-                  ref={transcriptFileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt,.psd,.ai,.ppt,.pptx"
-                  onChange={handleTranscriptUpload}
-                  className="hidden"
-                />
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4 items-center justify-start">
-            <Button
-              className="w-[120px] h-[56px]"
-              onClick={handlePublish}
-            >
-              Publish
-            </Button>
+          <div className="flex gap-4 items-center justify-end">
             <Button
               variant="ghost"
               className="w-[120px] h-[56px] border border-[#965cdf] text-white"
               onClick={handleCancel}
+              disabled={isPublishing}
             >
               Cancel
             </Button>
+            <Button
+              className="w-[120px] h-[56px]"
+              onClick={handlePublish}
+              disabled={isPublishing}
+            >
+              {isPublishing ? `Publishing... ${publishProgress}%` : 'Publish'}
+            </Button>
+            {isPublishing && publishProgress > 0 && publishProgress < 100 && (
+              <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+                <div
+                  className="bg-[#965cdf] h-full transition-all duration-300"
+                  style={{ width: `${publishProgress}%` }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* File Upload Popup */}
+      {uploadType && (
+        <FileUploadPopup
+          isOpen={isUploadPopupOpen}
+          onClose={() => {
+            setIsUploadPopupOpen(false);
+            setUploadType(null);
+          }}
+          onUpload={handleUploadComplete}
+          accept={getUploadPopupConfig().accept}
+          maxFiles={getUploadPopupConfig().maxFiles}
+          title={getUploadPopupConfig().title}
+          supportedFormats={getUploadPopupConfig().supportedFormats}
+          contentTypes={[
+            { value: 'image', label: 'Image' },
+            { value: 'transcript', label: 'Transcript' },
+            { value: 'audio', label: 'Audio' },
+          ]}
+        />
+      )}
     </div>
   );
 };

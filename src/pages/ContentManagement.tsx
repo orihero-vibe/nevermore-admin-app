@@ -351,11 +351,11 @@ export const ContentManagement = () => {
           onClick={() => setIsUploadModalOpen(false)}
         >
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
           
           {/* Modal Content */}
           <div
-            className="relative backdrop-blur-[10px] bg-[rgba(255,255,255,0.1)] rounded-[16px] px-[32px] py-[40px] w-[406px] flex flex-col gap-[32px] items-start"
+            className="relative backdrop-blur-[20px] bg-[rgba(255,255,255,0.1)] rounded-[16px] px-[32px] py-[40px] w-[406px] flex flex-col gap-[32px] items-start"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Title */}
