@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SearchBar } from '../components/SearchBar';
 import { Select } from '../components/Select';
@@ -7,150 +7,59 @@ import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import { Pagination } from '../components/Pagination';
 import { Button } from '../components/Button';
+import { fetchContent, type ContentDocument } from '../lib/content';
+import { fetchCategories, getCategoryName, type Category } from '../lib/categories';
+import { showAppwriteError } from '../lib/notifications';
 
 interface ContentItem extends Record<string, unknown> {
   id: string;
   title: string;
-  category: string;
-  role: string;
-  type: string;
+  category: string; // Display name or empty string
+  role: string; // Capitalized: Support, Recovery, Prevention
+  type: string; // Display: '40 Temptations' or '40 Day Journey'
   // Journey-specific fields
   tasks?: string[];
   hasAudio?: boolean;
 }
 
-const sampleData: ContentItem[] = [
-  {
-    id: '1',
-    title: 'Anxiety',
-    category: 'Emotional & Psychological Triggers',
-    role: 'Support',
-    type: '40 Temptations',
-  },
-  {
-    id: '2',
-    title: 'Day 3',
-    category: '',
-    role: '',
-    type: '40 Day Journey',
-    tasks: ['Day 3 Check-in', 'Read a Book', 'You should listen to this', 'Exercise', 'Exercise'],
-    hasAudio: true,
-  },
-  {
-    id: '3',
-    title: 'Death of a Friend',
-    category: 'Emotional & Psychological Triggers',
-    role: 'Recovery',
-    type: '40 Day Journey',
-    tasks: ['Grief Processing', 'Write in Journal', 'Connect with Support', 'Practice Self-care', 'Reflect on Memories'],
-    hasAudio: true,
-  },
-  {
-    id: '4',
-    title: 'Day 2',
-    category: '',
-    role: '',
-    type: '40 Day Journey',
-    tasks: ['Day 2 Check-in', 'Read a Book', 'You should listen to this', 'Exercise', 'Exercise'],
-    hasAudio: true,
-  },
-  {
-    id: '5',
-    title: 'Economic Status',
-    category: 'Financial & Lifestyle Impacts',
-    role: 'Recovery',
-    type: '40 Temptations',
-  },
-  {
-    id: '6',
-    title: 'Avoiding the Doctor',
-    category: 'Physical Health & Medical Avoidance',
-    role: 'Support',
-    type: '40 Temptations',
-  },
-  {
-    id: '7',
-    title: 'Economic Status',
-    category: 'Financial & Lifestyle Impacts',
-    role: 'Recovery',
-    type: '40 Temptations',
-  },
-  {
-    id: '8',
-    title: 'Avoiding the Doctor',
-    category: 'Physical Health & Medical Avoidance',
-    role: 'Support',
-    type: '40 Temptations',
-  },
-];
-
-// Generate more sample data to reach 330 items
-const generateMoreData = (): ContentItem[] => {
-  const categories = [
-    'Emotional & Psychological Triggers',
-    'Financial & Lifestyle Impacts',
-    'Physical Health & Medical Avoidance',
-    'Social & Relationship Challenges',
-  ];
-  const roles = ['Support', 'Recovery', 'Prevention'];
-  const types = ['40 Temptations', '40 Day Journey'];
-  const titles = [
-    'Anger',
-    'Depression',
-    'Loneliness',
-    'Stress',
-    'Work Pressure',
-    'Family Issues',
-    'Health Concerns',
-    'Financial Worries',
-    'Day 1',
-    'Day 4',
-    'Day 5',
-    'Day 6',
-    'Day 7',
-    'Day 8',
-    'Day 9',
-    'Day 10',
-  ];
-
-  const data: ContentItem[] = [];
-  for (let i = 0; i < 330 - sampleData.length; i++) {
-    const titleIndex = i % titles.length;
-    const categoryIndex = i % categories.length;
-    const roleIndex = i % roles.length;
-    const typeIndex = i % types.length;
-    const isJourney = types[typeIndex] === '40 Day Journey';
-
-    data.push({
-      id: String(sampleData.length + i + 1),
-      title: titles[titleIndex],
-      category: Math.random() > 0.3 ? categories[categoryIndex] : '',
-      role: Math.random() > 0.3 ? roles[roleIndex] : '',
-      type: types[typeIndex],
-      // Add tasks for journey items
-      tasks: isJourney ? [
-        `${titles[titleIndex]} Check-in`,
-        'Read a Book',
-        'You should listen to this',
-        'Exercise',
-        'Exercise',
-      ] : undefined,
-      hasAudio: isJourney ? Math.random() > 0.5 : false,
-    });
+/**
+ * Map Appwrite content document to ContentItem for display
+ */
+function mapContentToItem(
+  doc: ContentDocument,
+  categories: Category[]
+): ContentItem {
+  // Get category name from ID
+  let categoryName = '';
+  if (doc.category) {
+    const category = categories.find((cat) => cat.$id === doc.category);
+    categoryName = category ? getCategoryName(category) : '';
   }
 
-  return [...sampleData, ...data];
-};
+  // Capitalize role (support -> Support, recovery -> Recovery)
+  const roleDisplay = doc.role
+    ? doc.role.charAt(0).toUpperCase() + doc.role.slice(1)
+    : '';
 
-const allData = generateMoreData();
+  // Map database type to display type
+  const typeDisplay =
+    doc.type === 'forty_day_journey'
+      ? '40 Day Journey'
+      : doc.type === 'forty_temptations'
+      ? '40 Temptations'
+      : doc.type;
 
-const categoryOptions: SelectOption[] = [
-  { value: '', label: 'All Categories' },
-  { value: 'emotional', label: 'Emotional & Psychological Triggers' },
-  { value: 'financial', label: 'Financial & Lifestyle Impacts' },
-  { value: 'physical', label: 'Physical Health & Medical Avoidance' },
-  { value: 'social', label: 'Social & Relationship Challenges' },
-];
+  return {
+    id: doc.$id,
+    title: doc.title,
+    category: categoryName,
+    role: roleDisplay,
+    type: typeDisplay,
+    tasks: doc.tasks,
+    hasAudio: doc.files && doc.files.length > 0,
+  };
+}
+
 
 const roleOptions: SelectOption[] = [
   { value: '', label: 'All Roles' },
@@ -174,6 +83,100 @@ export const ContentManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [contentItems, setContentItems] = useState<ContentItem[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const fetchedCategories = await fetchCategories();
+        setCategories(fetchedCategories);
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+        // Continue without categories - content will still load
+      }
+    };
+    loadCategories();
+  }, []);
+
+  // Fetch content when filters, search, or pagination changes
+  useEffect(() => {
+    const loadContent = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Calculate offset for pagination
+        const offset = (currentPage - 1) * itemsPerPage;
+
+        // Map filter values to database values
+        const filters: {
+          category?: string;
+          role?: string;
+          type?: string;
+        } = {};
+
+        // Category filter - use category ID directly
+        if (selectedCategory) {
+          // selectedCategory is already the category ID from the dropdown
+          filters.category = selectedCategory;
+        }
+
+        // Role filter - convert display to database value
+        if (selectedRole) {
+          const roleOption = roleOptions.find(
+            (opt) => opt.value === selectedRole
+          );
+          if (roleOption && roleOption.label !== 'All Roles') {
+            filters.role = roleOption.value; // Already lowercase
+          }
+        }
+
+        // Type filter
+        if (selectedType) {
+          filters.type = selectedType;
+        }
+
+        // Fetch content from Appwrite
+        const result = await fetchContent(
+          itemsPerPage,
+          offset,
+          searchQuery || undefined,
+          Object.keys(filters).length > 0 ? filters : undefined
+        );
+
+        // Map documents to display items
+        const mappedItems = result.documents.map((doc) =>
+          mapContentToItem(doc, categories)
+        );
+
+        setContentItems(mappedItems);
+        setTotalItems(result.total);
+      } catch (err) {
+        console.error('Error loading content:', err);
+        setError('Failed to load content. Please try again.');
+        showAppwriteError(err);
+        setContentItems([]);
+        setTotalItems(0);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadContent();
+  }, [
+    currentPage,
+    itemsPerPage,
+    searchQuery,
+    selectedCategory,
+    selectedRole,
+    selectedType,
+    categories,
+  ]);
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -195,38 +198,14 @@ export const ContentManagement = () => {
     };
   }, [isUploadModalOpen]);
 
-  // Filter data based on search and filters
-  const filteredData = allData.filter((item) => {
-    const matchesSearch =
-      !searchQuery ||
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.type.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategory =
-      !selectedCategory ||
-      item.category ===
-        categoryOptions.find((opt) => opt.value === selectedCategory)?.label;
-
-    const matchesRole =
-      !selectedRole ||
-      item.role === roleOptions.find((opt) => opt.value === selectedRole)?.label;
-
-    const matchesType =
-      !selectedType ||
-      item.type === typeOptions.find((opt) => opt.value === selectedType)?.label;
-
-    return (
-      matchesSearch && matchesCategory && matchesRole && matchesType
-    );
-  });
-
-  // Paginate filtered data
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedData = filteredData.slice(startIndex, endIndex);
-  const totalItems = filteredData.length;
+  // Update category options when categories are loaded
+  const categoryOptions: SelectOption[] = useMemo(() => [
+    { value: '', label: 'All Categories' },
+    ...categories.map((cat) => ({
+      value: cat.$id,
+      label: getCategoryName(cat),
+    })),
+  ], [categories]);
 
   const columns: Column<ContentItem>[] = [
     { key: 'title', label: 'Title' },
@@ -328,11 +307,31 @@ export const ContentManagement = () => {
 
       {/* Data Table */}
       <div>
-        <DataTable<ContentItem> 
-          columns={columns} 
-          data={paginatedData} 
-          onRowClick={handleRowClick}
-        />
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-white text-[16px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+              Loading content...
+            </p>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-red-400 text-[16px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+              {error}
+            </p>
+          </div>
+        ) : contentItems.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-white text-[16px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+              No content found. Try adjusting your filters or create new content.
+            </p>
+          </div>
+        ) : (
+          <DataTable<ContentItem> 
+            columns={columns} 
+            data={contentItems} 
+            onRowClick={handleRowClick}
+          />
+        )}
       </div>
 
       {/* Pagination */}

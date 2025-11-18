@@ -8,7 +8,8 @@ interface ChangeEmailModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentEmail?: string;
-  onSave?: (newEmail: string, currentPassword: string) => void;
+  onSave?: (newEmail: string, currentPassword: string) => Promise<void>;
+  isLoading?: boolean;
 }
 
 export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
@@ -16,23 +17,26 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
   onClose,
   currentEmail = '',
   onSave,
+  isLoading = false,
 }) => {
   const [newEmail, setNewEmail] = useState(currentEmail);
   const [currentPassword, setCurrentPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setNewEmail(currentEmail);
       setCurrentPassword('');
       setShowPassword(false);
+      setError('');
     }
   }, [isOpen, currentEmail]);
 
   // Handle ESC key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && !isLoading) {
         onClose();
       }
     };
@@ -46,12 +50,29 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isLoading]);
 
-  const handleSave = () => {
-    if (newEmail && currentPassword) {
-      onSave?.(newEmail, currentPassword);
-      onClose();
+  const handleSave = async () => {
+    if (!newEmail || !currentPassword) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (newEmail === currentEmail) {
+      setError('New email must be different from current email');
+      return;
+    }
+
+    setError('');
+    try {
+      await onSave?.(newEmail, currentPassword);
+      // Modal will be closed by parent component on success
+    } catch (error) {
+      // Error is handled by parent component, but we can show it here too
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to update email. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -60,7 +81,7 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      onClick={onClose}
+      onClick={isLoading ? undefined : onClose}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" />
@@ -82,6 +103,7 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
             onClick={onClose}
             className="p-1 hover:opacity-70 transition"
             aria-label="Close modal"
+            disabled={isLoading}
           >
             <CloseIcon width={24} height={24} color="#fff" />
           </button>
@@ -94,6 +116,13 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
         >
           To change your email please enter your current password for verification.
         </p>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        )}
 
         {/* Form Fields */}
         <div className="flex flex-col gap-6">
@@ -155,14 +184,15 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
           <Button
             onClick={handleSave}
             className="flex-1"
-            disabled={!newEmail || !currentPassword}
+            disabled={!newEmail || !currentPassword || isLoading}
           >
-            Save Changes
+            {isLoading ? 'Saving...' : 'Save Changes'}
           </Button>
           <Button
             onClick={onClose}
             variant="ghost"
             className="flex-1 border-[#965cdf] text-white"
+            disabled={isLoading}
           >
             Cancel
           </Button>

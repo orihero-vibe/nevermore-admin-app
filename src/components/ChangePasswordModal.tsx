@@ -37,8 +37,9 @@ const validationRules: ValidationRule[] = [
 interface ChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave?: (currentPassword: string, newPassword: string) => void;
+  onSave?: (currentPassword: string, newPassword: string) => Promise<void>;
   onForgotPassword?: () => void;
+  isLoading?: boolean;
 }
 
 export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
@@ -46,6 +47,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   onClose,
   onSave,
   onForgotPassword,
+  isLoading = false,
 }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -53,6 +55,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -62,13 +65,14 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       setShowCurrentPassword(false);
       setShowNewPassword(false);
       setShowConfirmPassword(false);
+      setError('');
     }
   }, [isOpen]);
 
   // Handle ESC key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && !isLoading) {
         onClose();
       }
     };
@@ -82,7 +86,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isLoading]);
 
   const getValidationStatus = (rule: ValidationRule) => {
     return rule.validate(newPassword, confirmPassword);
@@ -92,10 +96,27 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     getValidationStatus(rule)
   );
 
-  const handleSave = () => {
-    if (currentPassword && newPassword && allValidationsPass) {
-      onSave?.(currentPassword, newPassword);
-      onClose();
+  const handleSave = async () => {
+    if (!currentPassword || !newPassword) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (!allValidationsPass) {
+      setError('Please ensure all password requirements are met');
+      return;
+    }
+
+    setError('');
+    try {
+      await onSave?.(currentPassword, newPassword);
+      // Modal will be closed by parent component on success
+    } catch (error) {
+      // Error is handled by parent component, but we can show it here too
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to update password. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -104,7 +125,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      onClick={onClose}
+      onClick={isLoading ? undefined : onClose}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" />
@@ -126,6 +147,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             onClick={onClose}
             className="p-1 hover:opacity-70 transition"
             aria-label="Close modal"
+            disabled={isLoading}
           >
             <CloseIcon width={24} height={24} color="#fff" />
           </button>
@@ -138,6 +160,13 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
         >
           To change your password please enter your current password for verification.
         </p>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        )}
 
         {/* Form Fields */}
         <div className="flex flex-col gap-6">
@@ -287,14 +316,15 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
           <Button
             onClick={handleSave}
             className="flex-1"
-            disabled={!currentPassword || !newPassword || !allValidationsPass}
+            disabled={!currentPassword || !newPassword || !allValidationsPass || isLoading}
           >
-            Save Changes
+            {isLoading ? 'Saving...' : 'Save Changes'}
           </Button>
           <Button
             onClick={onClose}
             variant="ghost"
             className="flex-1 border-[#965cdf] text-white"
+            disabled={isLoading}
           >
             Cancel
           </Button>

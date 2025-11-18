@@ -13,6 +13,7 @@ import { ContentManagement } from '../pages/ContentManagement';
 import { Journey40Day } from '../pages/Journey40Day';
 import { TemptationDetails } from '../pages/TemptationDetails';
 import { Settings } from '../pages/Settings';
+import { TermsAndPrivacy } from '../pages/TermsAndPrivacy';
 
 export const router = createBrowserRouter([
   {
@@ -84,6 +85,10 @@ export const router = createBrowserRouter([
         element: <Settings />,
       },
       {
+        path: 'terms-and-privacy',
+        element: <TermsAndPrivacy />,
+      },
+      {
         path: 'journey-40-day/:id?',
         element: <Journey40Day />,
       },
@@ -142,6 +147,24 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <Settings />,
+      },
+      {
+        path: '*',
+        element: <NotFound />,
+      },
+    ],
+  },
+  {
+    path: '/terms-and-privacy',
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <TermsAndPrivacy />,
       },
       {
         path: '*',

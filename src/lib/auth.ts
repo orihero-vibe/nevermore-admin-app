@@ -135,6 +135,64 @@ export const updatePasswordRecovery = async (
 };
 
 /**
+ * Update user email
+ */
+export const updateEmail = async (
+  email: string,
+  password: string
+): Promise<Models.User<Models.Preferences>> => {
+  try {
+    const user = await account.updateEmail({
+      email,
+      password,
+    });
+    return user;
+  } catch (error: unknown) {
+    showAppwriteError(error, { skipUnauthorized: true });
+    throw error;
+  }
+};
+
+/**
+ * Update user password
+ */
+export const updatePassword = async (
+  password: string,
+  oldPassword: string
+): Promise<Models.User<Models.Preferences>> => {
+  try {
+    const user = await account.updatePassword({
+      password,
+      oldPassword,
+    });
+    return user;
+  } catch (error: unknown) {
+    showAppwriteError(error, { skipUnauthorized: true });
+    throw error;
+  }
+};
+
+/**
+ * Update user phone number
+ * Password is required for security verification
+ */
+export const updatePhone = async (
+  phone: string,
+  password: string
+): Promise<Models.User<Models.Preferences>> => {
+  try {
+    const user = await account.updatePhone({
+      phone,
+      password,
+    });
+    return user;
+  } catch (error: unknown) {
+    showAppwriteError(error, { skipUnauthorized: true });
+    throw error;
+  }
+};
+
+/**
  * Convert Appwrite User to our User type
  */
 export const mapAppwriteUserToUser = (

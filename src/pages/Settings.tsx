@@ -1,15 +1,63 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import EditIcon from '../assets/icons/edit';
 import { ChangeEmailModal } from '../components/ChangeEmailModal';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { ChangePhoneNumberModal } from '../components/ChangePhoneNumberModal';
+import { getCurrentUser, updateEmail, updatePassword, updatePhone } from '../lib/auth';
+import { showSuccess, showAppwriteError } from '../lib/notifications';
+import type { Models } from 'appwrite';
+
+// Helper function to format phone number for display
+const formatPhoneNumber = (phone: string | undefined): string => {
+  if (!phone) return '';
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, '');
+  // Format as (XXX) XXX-XXXX if 10 digits
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  // Return as-is if not standard format
+  return phone;
+};
+
+// Helper function to format date
+const formatDate = (dateString: string | undefined): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}-${day}-${year}`;
+};
 
 export const Settings = () => {
-  const [email, setEmail] = useState('adminname@gmail.com');
-  const [phoneNumber, setPhoneNumber] = useState('(123) 456-7890');
+  const navigate = useNavigate();
+  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
+  const [isSavingEmail, setIsSavingEmail] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
+
+  // Fetch current user data on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      setIsLoading(true);
+      try {
+        const currentUser = await getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        showAppwriteError(error, { skipUnauthorized: true });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   const handleEmailEdit = () => {
     setIsEmailModalOpen(true);
@@ -23,27 +71,72 @@ export const Settings = () => {
     setIsPasswordModalOpen(true);
   };
 
-  const handleEmailSave = (newEmail: string, currentPassword: string) => {
-    // TODO: Implement API call to save email
-    console.log('Saving email:', { newEmail, currentPassword });
-    setEmail(newEmail);
+  const handleEmailSave = async (newEmail: string, currentPassword: string) => {
+    setIsSavingEmail(true);
+    try {
+      const updatedUser = await updateEmail(newEmail, currentPassword);
+      setUser(updatedUser);
+      showSuccess('Email updated successfully');
+      setIsEmailModalOpen(false);
+    } catch {
+      // Error is already handled by updateEmail function
+      // Don't close modal on error so user can retry
+    } finally {
+      setIsSavingEmail(false);
+    }
   };
 
-  const handlePasswordSave = (currentPassword: string, newPassword: string) => {
-    // TODO: Implement API call to save password
-    console.log('Saving password:', { currentPassword, newPassword });
+  const handlePasswordSave = async (currentPassword: string, newPassword: string) => {
+    setIsSavingPassword(true);
+    try {
+      await updatePassword(newPassword, currentPassword);
+      showSuccess('Password updated successfully');
+      setIsPasswordModalOpen(false);
+    } catch {
+      // Error is already handled by updatePassword function
+      // Don't close modal on error so user can retry
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
-  const handlePhoneSave = (newPhoneNumber: string) => {
-    // TODO: Implement API call to save phone number
-    console.log('Saving phone number:', newPhoneNumber);
-    setPhoneNumber(newPhoneNumber);
+  const handlePhoneSave = async (newPhoneNumber: string, password: string) => {
+    setIsSavingPhone(true);
+    try {
+      const updatedUser = await updatePhone(newPhoneNumber, password);
+      setUser(updatedUser);
+      showSuccess('Phone number updated successfully');
+      setIsPhoneModalOpen(false);
+    } catch {
+      // Error is already handled by updatePhone function
+      // Don't close modal on error so user can retry
+    } finally {
+      setIsSavingPhone(false);
+    }
   };
 
   const handleForgotPassword = () => {
-    // TODO: Navigate to forgot password page
-    console.log('Forgot password clicked');
+    navigate('/forgot-password');
   };
+
+  if (isLoading) {
+    return (
+      <div className="bg-neutral-950 min-h-screen p-8 flex items-center justify-center">
+        <p className="text-white text-[16px]">Loading...</p>
+      </div>
+    );
+  }
+
+  const displayName = user?.name || user?.email || 'User';
+  const displayEmail = user?.email || '';
+  const displayPhone = formatPhoneNumber(user?.phone);
+  const accountCreatedDate = formatDate(user?.$createdAt);
+  const initials = displayName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || displayName[0]?.toUpperCase() || 'U';
 
   return (
     <div className="bg-neutral-950 min-h-screen p-8">
@@ -63,7 +156,7 @@ export const Settings = () => {
           <div className="relative">
             <div className="w-[120px] h-[120px] rounded-full bg-gray-700 flex items-center justify-center">
               <span className="text-4xl text-gray-400">
-                S
+                {initials}
               </span>
             </div>
             {/* Online Status Indicator */}
@@ -75,16 +168,18 @@ export const Settings = () => {
             className="text-white text-[16px] leading-[24px] font-medium"
             style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
           >
-            Super Admin
+            {displayName}
           </p>
           
           {/* Account Created Date */}
-          <p 
-            className="text-[#8f8f8f] text-[12px] leading-[16px]"
-            style={{ fontFamily: 'Roboto, sans-serif' }}
-          >
-            Account Created: 06-15-2023
-          </p>
+          {accountCreatedDate && (
+            <p 
+              className="text-[#8f8f8f] text-[12px] leading-[16px]"
+              style={{ fontFamily: 'Roboto, sans-serif' }}
+            >
+              Account Created: {accountCreatedDate}
+            </p>
+          )}
         </div>
 
         {/* Account Information Section */}
@@ -111,12 +206,13 @@ export const Settings = () => {
               <div className="relative">
                 <div className="w-full h-[56px] px-4 pr-12 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] flex items-center relative">
                   <p className="flex-1 text-white font-lato text-[16px] leading-[24px]">
-                    {email}
+                    {displayEmail || 'No email set'}
                   </p>
                   <button
                     onClick={handleEmailEdit}
                     className="absolute right-4 p-1 hover:opacity-70 transition"
                     aria-label="Edit email"
+                    disabled={isSavingEmail}
                   >
                     <EditIcon width={24} height={24} color="#fff" />
                   </button>
@@ -136,12 +232,13 @@ export const Settings = () => {
               <div className="relative">
                 <div className="w-full h-[56px] px-4 pr-12 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] flex items-center relative">
                   <p className="flex-1 text-white font-lato text-[16px] leading-[24px]">
-                    {phoneNumber}
+                    {displayPhone || 'No phone number set'}
                   </p>
                   <button
                     onClick={handlePhoneEdit}
                     className="absolute right-4 p-1 hover:opacity-70 transition"
                     aria-label="Edit phone number"
+                    disabled={isSavingPhone}
                   >
                     <EditIcon width={24} height={24} color="#fff" />
                   </button>
@@ -167,6 +264,7 @@ export const Settings = () => {
                     onClick={handlePasswordEdit}
                     className="absolute right-4 p-1 hover:opacity-70 transition"
                     aria-label="Edit password"
+                    disabled={isSavingPassword}
                   >
                     <EditIcon width={24} height={24} color="#fff" />
                   </button>
@@ -181,8 +279,9 @@ export const Settings = () => {
       <ChangeEmailModal
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
-        currentEmail={email}
+        currentEmail={displayEmail}
         onSave={handleEmailSave}
+        isLoading={isSavingEmail}
       />
 
       <ChangePasswordModal
@@ -190,13 +289,15 @@ export const Settings = () => {
         onClose={() => setIsPasswordModalOpen(false)}
         onSave={handlePasswordSave}
         onForgotPassword={handleForgotPassword}
+        isLoading={isSavingPassword}
       />
 
       <ChangePhoneNumberModal
         isOpen={isPhoneModalOpen}
         onClose={() => setIsPhoneModalOpen(false)}
-        currentPhoneNumber={phoneNumber}
+        currentPhoneNumber={displayPhone}
         onSave={handlePhoneSave}
+        isLoading={isSavingPhone}
       />
     </div>
   );

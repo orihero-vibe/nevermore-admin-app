@@ -71,13 +71,16 @@ export const Journey40Day = () => {
     if (audioFiles.length > 0) {
       setUploadedFiles(audioFiles);
       setShowAudioPlayer(true);
-      // If content title is empty, set a default from the first file
-      if (!contentTitle && audioFiles[0]) {
+      // If content title is empty, suggest a title from the first file
+      if (!contentTitle.trim() && audioFiles[0]) {
         const fileName = audioFiles[0].name;
         const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
         setContentTitle(nameWithoutExt);
       }
     }
+    
+    // Close the upload popup after handling files
+    setIsUploadPopupOpen(false);
   };
 
   const handlePublish = async () => {
@@ -96,20 +99,27 @@ export const Journey40Day = () => {
     // Filter out empty tasks
     const validTasks = tasks.filter((task) => task.trim().length > 0);
 
+    // Warn if no tasks are provided (but allow publishing)
+    if (validTasks.length === 0) {
+      console.warn('No tasks provided for the journey');
+    }
+
     setIsPublishing(true);
     setPublishProgress(0);
 
     try {
       // Publish content (uploads files and creates content document)
+      // Files are uploaded to the same storage bucket
+      // Content is saved to the same content table with type 'forty_day_journey'
       await publishContent(
         {
-          title: contentTitle,
-          type: 'forty_day_journey', // Must be one of: forty_day_journey, forty_temptations
+          title: contentTitle.trim(),
+          type: 'forty_day_journey', // Content type: forty_day_journey
         },
-        [], // No images for journey
-        uploadedFiles, // Audio files
-        null, // No transcript
-        validTasks.length > 0 ? validTasks : undefined, // Tasks array
+        [], // No images for 40-day journey
+        uploadedFiles, // Audio files - uploaded to storage
+        null, // No transcript for journey
+        validTasks.length > 0 ? validTasks : undefined, // Tasks array - stored in content document
         (progress) => {
           setPublishProgress(progress);
         }
@@ -143,7 +153,7 @@ export const Journey40Day = () => {
         <h2
           className="text-white text-[24px] leading-normal font-cinzel font-normal whitespace-nowrap"
         >
-          {isEditMode ? 'Upload New Journey' : showAudioPlayer ? 'Upload New Journey' : '40-Day Journey'}
+          {isEditMode ? 'Edit 40-Day Journey' : 'Create 40-Day Journey'}
         </h2>
       </div>
 
@@ -154,45 +164,26 @@ export const Journey40Day = () => {
           {/* Left Section - Content Title and Audio */}
           <div className="flex-1 flex flex-col gap-10 items-end">
             {/* Content Title with Upload Button */}
-            {showAudioPlayer || isEditMode ? (
-              <div className="flex items-end justify-between w-full">
-                <div className="flex flex-col gap-0 w-[370px]">
-                  <label className="text-white text-[14px] leading-[24px] font-roboto font-normal">
-                    Title
-                  </label>
-                  <h3 className="text-white text-[40px] leading-[40px] font-cinzel font-normal">
-                    {contentTitle || 'Day 2'}
-                  </h3>
-                </div>
-                <Button
-                  onClick={handleUploadFiles}
-                  className="w-[120px] h-[56px] rounded-[12px]"
-                >
-                  Upload Files
-                </Button>
+            <div className="flex gap-4 items-end w-full">
+              <div className="flex-1 flex flex-col gap-2">
+                <label className="text-white text-[14px] leading-[20px] font-roboto font-normal">
+                  Content Title
+                </label>
+                <input
+                  type="text"
+                  value={contentTitle}
+                  onChange={(e) => setContentTitle(e.target.value)}
+                  placeholder="Enter journey title (e.g., Day 1, Day 2)"
+                  className="h-[56px] bg-[#131313] border border-[#965cdf] rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf]"
+                />
               </div>
-            ) : (
-              <div className="flex gap-4 items-end w-full">
-                <div className="flex-1 flex flex-col gap-2">
-                  <label className="text-white text-[14px] leading-[20px] font-roboto font-normal">
-                    Content Title
-                  </label>
-                  <input
-                    type="text"
-                    value={contentTitle}
-                    onChange={(e) => setContentTitle(e.target.value)}
-                    placeholder=""
-                    className="h-[56px] bg-[#131313] border border-[#965cdf] rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-white focus:outline-none focus:ring-2 focus:ring-[#965cdf]"
-                  />
-                </div>
-                <Button
-                  onClick={handleUploadFiles}
-                  className="w-[184px] h-[56px] rounded-[12px]"
-                >
-                  Upload Files
-                </Button>
-              </div>
-            )}
+              <Button
+                onClick={handleUploadFiles}
+                className="w-[184px] h-[56px] rounded-[12px]"
+              >
+                Upload Files
+              </Button>
+            </div>
 
             {/* Audio Player */}
             {showAudioPlayer && uploadedFiles.length > 0 && (

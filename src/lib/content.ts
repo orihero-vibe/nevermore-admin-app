@@ -1,5 +1,5 @@
 import { storage, databases } from './appwrite';
-import { ID } from 'appwrite';
+import { ID, Query } from 'appwrite';
 import { showAppwriteError, showSuccess } from './notifications';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID || '';
@@ -221,6 +221,107 @@ export async function publishContent(
     return contentId;
   } catch (error) {
     console.error('Error publishing content:', error);
+    throw error;
+  }
+}
+
+/**
+ * Content document from Appwrite
+ */
+export interface ContentDocument {
+  $id: string;
+  title: string;
+  category?: string; // Category ID (relationship)
+  role?: string; // Enum: support, recovery, prevention
+  type: string; // Enum: forty_day_journey, forty_temptations
+  images?: string[];
+  files?: string[]; // Audio files URLs
+  transcript?: string;
+  tasks?: string[];
+  $createdAt?: string;
+  $updatedAt?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Fetch all content documents from Appwrite
+ */
+export async function fetchContent(
+  limit?: number,
+  offset?: number,
+  searchQuery?: string,
+  filters?: {
+    category?: string;
+    role?: string;
+    type?: string;
+  }
+): Promise<{ documents: ContentDocument[]; total: number }> {
+  // Validate environment variables
+  if (!DATABASE_ID) {
+    const error = new Error(
+      'VITE_APPWRITE_DATABASE_ID is not set in environment variables. Please add it to your .env file.'
+    );
+    console.error('Configuration Error:', error.message);
+    throw error;
+  }
+
+  if (!CONTENT_COLLECTION_ID) {
+    const error = new Error(
+      'VITE_APPWRITE_CONTENT_COLLECTION_ID is not set in environment variables. Please add it to your .env file.'
+    );
+    console.error('Configuration Error:', error.message);
+    throw error;
+  }
+
+  try {
+    const queries: string[] = [];
+
+    // Add pagination queries
+    if (limit !== undefined) {
+      queries.push(Query.limit(limit));
+    }
+    if (offset !== undefined) {
+      queries.push(Query.offset(offset));
+    }
+
+    // Add search query if provided
+    if (searchQuery && searchQuery.trim()) {
+      queries.push(Query.search('title', searchQuery.trim()));
+    }
+
+    // Add filters
+    if (filters?.category) {
+      queries.push(Query.equal('category', filters.category));
+    }
+    if (filters?.role) {
+      queries.push(Query.equal('role', filters.role));
+    }
+    if (filters?.type) {
+      // Map display type to database type
+      const typeMap: Record<string, string> = {
+        '40-temptations': 'forty_temptations',
+        '40-day-journey': 'forty_day_journey',
+      };
+      const dbType = typeMap[filters.type] || filters.type;
+      queries.push(Query.equal('type', dbType));
+    }
+
+    // Order by creation date (newest first)
+    queries.push(Query.orderDesc('$createdAt'));
+
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      CONTENT_COLLECTION_ID,
+      queries
+    );
+
+    return {
+      documents: response.documents as ContentDocument[],
+      total: response.total,
+    };
+  } catch (error) {
+    console.error('Error fetching content:', error);
+    showAppwriteError(error);
     throw error;
   }
 }
