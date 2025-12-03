@@ -1,11 +1,59 @@
-import { account } from "./appwrite";
+import { account, tablesDB } from "./appwrite";
+import { Query } from "appwrite";
 import type { Models } from "appwrite";
 import type { User } from "../types";
 import { showAppwriteError } from "./notifications";
 import { isUnauthorizedError } from "./errorHandler";
 
+const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID || '';
+const USER_PROFILES_COLLECTION_ID = import.meta.env.VITE_APPWRITE_USER_PROFILES_COLLECTION_ID || 'user_profiles';
+
+interface UserProfile {
+  $id: string;
+  type: string;
+  auth_id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Get user profile from user_profiles collection by auth_id
+ */
+const getUserProfile = async (authId: string): Promise<UserProfile | null> => {
+  if (!DATABASE_ID || !USER_PROFILES_COLLECTION_ID) {
+    console.error('Database ID or User Profiles Collection ID not configured');
+    return null;
+  }
+
+  try {
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: USER_PROFILES_COLLECTION_ID,
+      queries: [
+        Query.equal('auth_id', authId),
+      ],
+    });
+
+    if (response.rows && response.rows.length > 0) {
+      return response.rows[0] as unknown as UserProfile;
+    }
+    return null;
+  } catch (error: unknown) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+};
+
+/**
+ * Check if user is a coach
+ */
+const isCoach = async (authId: string): Promise<boolean> => {
+  const profile = await getUserProfile(authId);
+  return profile?.type === 'coach';
+};
+
 /**
  * Sign in with email and password
+ * Only allows login if user type is 'coach'
  */
 export const signIn = async (
   email: string,
@@ -13,6 +61,23 @@ export const signIn = async (
 ): Promise<Models.Session> => {
   try {
     const session = await account.createEmailPasswordSession({email, password});
+    
+    // After successful login, verify user is a coach
+    const appwriteUser = await account.get();
+    if (appwriteUser) {
+      const userIsCoach = await isCoach(appwriteUser.$id);
+      
+      if (!userIsCoach) {
+        // User is not a coach - sign them out and throw error
+        try {
+          await account.deleteSession({sessionId: "current"});
+        } catch {
+          // Ignore sign out errors
+        }
+        throw new Error('Access denied. Only coaches can access the admin panel.');
+      }
+    }
+    
     return session;
   } catch (error: unknown) {
     // Don't show notification for invalid credentials (401) - we'll show it in the form
@@ -50,11 +115,27 @@ export const getCurrentSession = async (): Promise<Models.Session | null> => {
 
 /**
  * Get current user
+ * Also validates that user is a coach
  */
 export const getCurrentUser =
   async (): Promise<Models.User<Models.Preferences> | null> => {
     try {
       const user = await account.get();
+      
+      // Validate user is a coach
+      if (user) {
+        const userIsCoach = await isCoach(user.$id);
+        if (!userIsCoach) {
+          // User is not a coach - sign them out
+          try {
+            await account.deleteSession({sessionId: "current"});
+          } catch {
+            // Ignore sign out errors
+          }
+          return null;
+        }
+      }
+      
       return user;
     } catch (error: unknown) {
       // 401 Unauthorized is expected when user is not authenticated (guest user)

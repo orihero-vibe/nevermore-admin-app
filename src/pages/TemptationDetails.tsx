@@ -457,7 +457,7 @@ export const TemptationDetails = () => {
 
             {/* Category Cards - Positioned absolutely on the left - Hide after file upload */}
             {!hasUploadedFiles && (
-              <div className="absolute left-[54px] top-[245px] flex flex-col gap-3 w-[342px]">
+              <div className="absolute left-[54px] top-[245px] flex flex-col gap-3 w-[342px] max-h-[500px] overflow-y-auto pr-2">
                 {isLoadingCategories ? (
                   <div className="text-[#8f8f8f] text-[14px] p-4" style={{ fontFamily: 'Roboto, sans-serif' }}>
                     Loading categories...

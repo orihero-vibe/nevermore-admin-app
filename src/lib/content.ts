@@ -1,5 +1,5 @@
-import { storage, databases } from './appwrite';
-import { ID, Query } from 'appwrite';
+import { storage, tablesDB } from './appwrite';
+import { Query, ID } from 'appwrite';
 import { showAppwriteError, showSuccess } from './notifications';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID || '';
@@ -15,6 +15,7 @@ export interface ContentData {
   files?: string[]; // Array of URLs (for audio files)
   transcript?: string; // Single URL
   tasks?: string[]; // Array of strings (for 40 Day Journey)
+  day?: number; // Day number (for 40 Day Journey)
 }
 
 export interface UploadedFile {
@@ -40,11 +41,18 @@ export async function uploadFile(
     const fileId = ID.unique();
     
     // Upload file to storage
-    const response = await storage.createFile(bucketId, fileId, file);
+    const response = await storage.createFile({
+      bucketId,
+      fileId,
+      file
+    });
     
     // Get the file URL using Appwrite Storage API
     // getFileView returns a URL string that can be used to view the file
-    const fileUrl = storage.getFileView(bucketId, response.$id);
+    const fileUrl = storage.getFileView({
+      bucketId,
+      fileId: response.$id
+    });
     
     return {
       fileId: response.$id,
@@ -134,17 +142,21 @@ export async function createContent(contentData: ContentData): Promise<string> {
       documentData.tasks = contentData.tasks;
     }
 
+    if (contentData.day !== undefined) {
+      documentData.day = contentData.day;
+    }
+
     if (contentData.transcript) {
       documentData.transcript = contentData.transcript;
     }
 
-    // Create the document
-    const response = await databases.createDocument(
-      DATABASE_ID,
-      CONTENT_COLLECTION_ID,
-      ID.unique(),
-      documentData
-    );
+    // Create the row
+    const response = await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: CONTENT_COLLECTION_ID,
+      rowId: ID.unique(),
+      data: documentData
+    });
 
     console.log('Content created successfully:', response.$id);
     return response.$id;
@@ -166,8 +178,7 @@ export async function publishContent(
   tasks?: string[],
   onProgress?: (progress: number) => void
 ): Promise<string> {
-  try {
-    let progress = 0;
+  try { 
     const totalSteps = 
       (imageFiles.length > 0 ? 1 : 0) +
       (audioFiles.length > 0 ? 1 : 0) +
@@ -238,6 +249,7 @@ export interface ContentDocument {
   files?: string[]; // Audio files URLs
   transcript?: string;
   tasks?: string[];
+  day?: number; // Day number (for 40 Day Journey)
   $createdAt?: string;
   $updatedAt?: string;
   [key: string]: unknown;
@@ -285,8 +297,9 @@ export async function fetchContent(
     }
 
     // Add search query if provided
+    // Using Query.contains() instead of Query.search() to avoid requiring a fulltext index
     if (searchQuery && searchQuery.trim()) {
-      queries.push(Query.search('title', searchQuery.trim()));
+      queries.push(Query.contains('title', searchQuery.trim()));
     }
 
     // Add filters
@@ -309,14 +322,14 @@ export async function fetchContent(
     // Order by creation date (newest first)
     queries.push(Query.orderDesc('$createdAt'));
 
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      CONTENT_COLLECTION_ID,
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: CONTENT_COLLECTION_ID,
       queries
-    );
+    });
 
     return {
-      documents: response.documents as ContentDocument[],
+      documents: response.rows as unknown as ContentDocument[],
       total: response.total,
     };
   } catch (error) {

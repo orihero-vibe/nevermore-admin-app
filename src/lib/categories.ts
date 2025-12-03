@@ -1,4 +1,4 @@
-import { databases } from './appwrite';
+import { tablesDB } from './appwrite';
 import { Query } from 'appwrite';
 import type { SelectOption } from '../components/Select';
 
@@ -47,39 +47,39 @@ export async function fetchCategories(): Promise<Category[]> {
 
   console.log('Fetching categories from:', {
     databaseId: DATABASE_ID,
-    collectionId: CATEGORY_COLLECTION_ID,
+    tableId: CATEGORY_COLLECTION_ID,
   });
 
   try {
     // Fetch categories sorted by order field (ascending)
     let response;
     try {
-      response = await databases.listDocuments(
-        DATABASE_ID,
-        CATEGORY_COLLECTION_ID,
-        [
+      response = await tablesDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: CATEGORY_COLLECTION_ID,
+        queries: [
           Query.orderAsc('order'), // Sort by order field in ascending order
         ]
-      );
+      });
     } catch (queryError) {
       // If query fails (e.g., order field doesn't exist or isn't indexed), fetch without ordering
       console.warn('Failed to fetch with order query, trying without query:', queryError);
-      response = await databases.listDocuments(
-        DATABASE_ID,
-        CATEGORY_COLLECTION_ID
-      );
+      response = await tablesDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: CATEGORY_COLLECTION_ID
+      });
     }
 
-    console.log('Successfully fetched categories:', response.documents.length);
+    console.log('Successfully fetched categories:', response.rows.length);
     
     // Log first category structure for debugging
-    if (response.documents.length > 0) {
-      console.log('Sample category structure:', Object.keys(response.documents[0]));
-      console.log('Sample category data:', response.documents[0]);
+    if (response.rows.length > 0) {
+      console.log('Sample category structure:', Object.keys(response.rows[0]));
+      console.log('Sample category data:', response.rows[0]);
     }
     
     // Sort manually by order (ascending) if query ordering didn't work
-    const documents = response.documents as Category[];
+    const documents = response.rows as Category[];
     if (documents.length > 0 && typeof documents[0].order === 'number') {
       // If we have order field, sort by it (ascending)
       documents.sort((a, b) => {

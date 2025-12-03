@@ -1,4 +1,4 @@
-import { databases } from './appwrite';
+import { tablesDB } from './appwrite';
 import { ID, Query } from 'appwrite';
 import { showAppwriteError, showSuccess } from './notifications';
 
@@ -34,17 +34,20 @@ export async function getSetting(key: 'terms' | 'privacy'): Promise<SettingDocum
   }
 
   try {
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      SETTINGS_COLLECTION_ID,
-      [Query.equal('key', key), Query.limit(1)]
-    );
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: SETTINGS_COLLECTION_ID,
+      queries: [
+        Query.equal('key', key),
+        Query.limit(1)
+      ]
+    });
 
-    if (response.documents.length === 0) {
+    if (response.rows.length === 0) {
       return null;
     }
 
-    return response.documents[0] as unknown as SettingDocument;
+    return response.rows[0] as unknown as SettingDocument;
   } catch (error) {
     console.error('Error fetching setting:', error);
     showAppwriteError(error);
@@ -78,28 +81,28 @@ export async function saveSetting(key: 'terms' | 'privacy', value: string): Prom
 
     if (existing) {
       // Update existing setting
-      const response = await databases.updateDocument(
-        DATABASE_ID,
-        SETTINGS_COLLECTION_ID,
-        existing.$id,
-        {
+      const response = await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: SETTINGS_COLLECTION_ID,
+        rowId: existing.$id,
+        data: {
           value: value,
         }
-      );
+      });
 
       showSuccess(`${key === 'terms' ? 'Terms and Conditions' : 'Privacy Policy'} updated successfully`);
       return response.$id;
     } else {
       // Create new setting
-      const response = await databases.createDocument(
-        DATABASE_ID,
-        SETTINGS_COLLECTION_ID,
-        ID.unique(),
-        {
+      const response = await tablesDB.createRow({
+        databaseId: DATABASE_ID,
+        tableId: SETTINGS_COLLECTION_ID,
+        rowId: ID.unique(),
+        data: {
           key: key,
           value: value,
         }
-      );
+      });
 
       showSuccess(`${key === 'terms' ? 'Terms and Conditions' : 'Privacy Policy'} created successfully`);
       return response.$id;

@@ -20,6 +20,7 @@ interface ContentItem extends Record<string, unknown> {
   // Journey-specific fields
   tasks?: string[];
   hasAudio?: boolean;
+  day?: number;
 }
 
 /**
@@ -57,6 +58,7 @@ function mapContentToItem(
     type: typeDisplay,
     tasks: doc.tasks,
     hasAudio: doc.files && doc.files.length > 0,
+    day: doc.day,
   };
 }
 
@@ -77,6 +79,7 @@ const typeOptions: SelectOption[] = [
 export const ContentManagement = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedType, setSelectedType] = useState('');
@@ -102,6 +105,16 @@ export const ContentManagement = () => {
     };
     loadCategories();
   }, []);
+
+  // Debounce search query (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1); // Reset to first page when search changes
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch content when filters, search, or pagination changes
   useEffect(() => {
@@ -145,7 +158,7 @@ export const ContentManagement = () => {
         const result = await fetchContent(
           itemsPerPage,
           offset,
-          searchQuery || undefined,
+          debouncedSearchQuery || undefined,
           Object.keys(filters).length > 0 ? filters : undefined
         );
 
@@ -171,7 +184,7 @@ export const ContentManagement = () => {
   }, [
     currentPage,
     itemsPerPage,
-    searchQuery,
+    debouncedSearchQuery,
     selectedCategory,
     selectedRole,
     selectedType,
@@ -257,7 +270,6 @@ export const ContentManagement = () => {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              setCurrentPage(1);
             }}
           />
         </div>
