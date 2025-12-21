@@ -18,7 +18,7 @@ const ChevronDownIcon = ({ width = 16, height = 16, color = "#fff", className }:
     <path
       d="M4 6l4 4 4-4"
       stroke={color}
-      strokeWidth={2}
+      strokeWidth={1}
       strokeLinecap="round"
       strokeLinejoin="round"
     />

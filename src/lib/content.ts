@@ -13,7 +13,8 @@ export interface ContentData {
   type: string; // Enum: required field
   images?: string[]; // Array of URLs
   files?: string[]; // Array of URLs (for audio files)
-  transcript?: string; // Single URL
+  transcript?: string; // Single URL (deprecated, use transcripts)
+  transcripts?: string[]; // Array of URLs (for multiple transcript files)
   tasks?: string[]; // Array of strings (for 40 Day Journey)
   day?: number; // Day number (for 40 Day Journey)
 }
@@ -150,6 +151,10 @@ export async function createContent(contentData: ContentData): Promise<string> {
       documentData.transcript = contentData.transcript;
     }
 
+    if (contentData.transcripts && contentData.transcripts.length > 0) {
+      documentData.transcripts = contentData.transcripts;
+    }
+
     // Create the row
     const response = await tablesDB.createRow({
       databaseId: DATABASE_ID,
@@ -175,6 +180,7 @@ export async function publishContent(
   imageFiles: File[],
   audioFiles: File[],
   transcriptFile: File | null,
+  transcriptFiles?: File[],
   tasks?: string[],
   onProgress?: (progress: number) => void
 ): Promise<string> {
@@ -183,6 +189,7 @@ export async function publishContent(
       (imageFiles.length > 0 ? 1 : 0) +
       (audioFiles.length > 0 ? 1 : 0) +
       (transcriptFile ? 1 : 0) +
+      (transcriptFiles && transcriptFiles.length > 0 ? 1 : 0) +
       1; // +1 for creating content
     let currentStep = 0;
 
@@ -206,12 +213,22 @@ export async function publishContent(
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
     }
 
-    // Upload transcript
+    // Upload single transcript (for backward compatibility)
     let transcriptUrl: string | undefined;
     if (transcriptFile) {
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
       const uploadedTranscript = await uploadFile(transcriptFile);
       transcriptUrl = uploadedTranscript.url;
+      currentStep++;
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+    }
+
+    // Upload multiple transcripts
+    let transcriptUrls: string[] = [];
+    if (transcriptFiles && transcriptFiles.length > 0) {
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+      const uploadedTranscripts = await uploadFiles(transcriptFiles);
+      transcriptUrls = uploadedTranscripts.map((file) => file.url);
       currentStep++;
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
     }
@@ -223,6 +240,7 @@ export async function publishContent(
       images: imageUrls.length > 0 ? imageUrls : undefined,
       files: audioUrls.length > 0 ? audioUrls : undefined, // Store audio files in 'files' array
       transcript: transcriptUrl,
+      transcripts: transcriptUrls.length > 0 ? transcriptUrls : undefined,
       tasks: tasks && tasks.length > 0 ? tasks : undefined,
     });
     currentStep++;
@@ -247,12 +265,224 @@ export interface ContentDocument {
   type: string; // Enum: forty_day_journey, forty_temptations
   images?: string[];
   files?: string[]; // Audio files URLs
-  transcript?: string;
+  transcript?: string; // Single URL (deprecated, use transcripts)
+  transcripts?: string[]; // Array of URLs (for multiple transcript files)
   tasks?: string[];
   day?: number; // Day number (for 40 Day Journey)
   $createdAt?: string;
   $updatedAt?: string;
   [key: string]: unknown;
+}
+
+/**
+ * Update content document in Appwrite Database
+ */
+export async function updateContent(
+  contentId: string,
+  contentData: ContentData
+): Promise<string> {
+  // Validate environment variables
+  if (!DATABASE_ID) {
+    const error = new Error(
+      'VITE_APPWRITE_DATABASE_ID is not set in environment variables. Please add it to your .env file.'
+    );
+    console.error('Configuration Error:', error.message);
+    throw error;
+  }
+
+  if (!CONTENT_COLLECTION_ID) {
+    const error = new Error(
+      'VITE_APPWRITE_CONTENT_COLLECTION_ID is not set in environment variables. Please add it to your .env file.'
+    );
+    console.error('Configuration Error:', error.message);
+    throw error;
+  }
+
+  try {
+    // Validate required fields
+    if (!contentData.type) {
+      throw new Error('Content type is required');
+    }
+
+    // Prepare the document data
+    const documentData: Record<string, unknown> = {
+      title: contentData.title,
+      type: contentData.type, // Required field
+    };
+
+    // Add optional fields if they exist
+    if (contentData.category) {
+      documentData.category = contentData.category; // Category ID for relationship
+    }
+
+    if (contentData.role) {
+      documentData.role = contentData.role;
+    }
+
+    if (contentData.images && contentData.images.length > 0) {
+      documentData.images = contentData.images;
+    } else {
+      documentData.images = []; // Clear images if empty
+    }
+
+    if (contentData.files && contentData.files.length > 0) {
+      documentData.files = contentData.files;
+    } else {
+      documentData.files = []; // Clear files if empty
+    }
+
+    if (contentData.tasks && contentData.tasks.length > 0) {
+      documentData.tasks = contentData.tasks;
+    }
+
+    if (contentData.day !== undefined) {
+      documentData.day = contentData.day;
+    }
+
+    if (contentData.transcript) {
+      documentData.transcript = contentData.transcript;
+    } else {
+      documentData.transcript = null; // Clear transcript if empty
+    }
+
+    if (contentData.transcripts && contentData.transcripts.length > 0) {
+      documentData.transcripts = contentData.transcripts;
+    } else {
+      documentData.transcripts = []; // Clear transcripts if empty
+    }
+
+    // Update the row
+    const response = await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: CONTENT_COLLECTION_ID,
+      rowId: contentId,
+      data: documentData
+    });
+
+    console.log('Content updated successfully:', response.$id);
+    return response.$id;
+  } catch (error) {
+    console.error('Error updating content:', error);
+    showAppwriteError(error);
+    throw error;
+  }
+}
+
+/**
+ * Update content with file uploads
+ */
+export async function updateContentWithFiles(
+  contentId: string,
+  contentData: ContentData,
+  imageFiles: File[],
+  audioFiles: File[],
+  transcriptFile: File | null,
+  tasks?: string[],
+  onProgress?: (progress: number) => void,
+  existingImageUrls?: string[],
+  existingAudioUrls?: string[],
+  existingTranscriptUrl?: string | null
+): Promise<string> {
+  try { 
+    const totalSteps = 
+      (imageFiles.length > 0 ? 1 : 0) +
+      (audioFiles.length > 0 ? 1 : 0) +
+      (transcriptFile ? 1 : 0) +
+      1; // +1 for updating content
+    let currentStep = 0;
+
+    // Upload new images
+    let newImageUrls: string[] = [];
+    if (imageFiles.length > 0) {
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+      const uploadedImages = await uploadFiles(imageFiles);
+      newImageUrls = uploadedImages.map((file) => file.url);
+      currentStep++;
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+    }
+
+    // Combine existing image URLs with new ones
+    const allImageUrls = [...(existingImageUrls || []), ...newImageUrls];
+
+    // Upload new audio files
+    let newAudioUrls: string[] = [];
+    if (audioFiles.length > 0) {
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+      const uploadedAudio = await uploadFiles(audioFiles);
+      newAudioUrls = uploadedAudio.map((file) => file.url);
+      currentStep++;
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+    }
+
+    // Combine existing audio URLs with new ones
+    const allAudioUrls = [...(existingAudioUrls || []), ...newAudioUrls];
+
+    // Upload new transcript
+    let newTranscriptUrl: string | undefined;
+    if (transcriptFile) {
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+      const uploadedTranscript = await uploadFile(transcriptFile);
+      newTranscriptUrl = uploadedTranscript.url;
+      currentStep++;
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+    }
+
+    // Use new transcript URL if uploaded, otherwise keep existing one
+    const finalTranscriptUrl = newTranscriptUrl || existingTranscriptUrl || undefined;
+
+    // Update content document
+    onProgress?.(Math.round((currentStep / totalSteps) * 100));
+    await updateContent(contentId, {
+      ...contentData,
+      images: allImageUrls.length > 0 ? allImageUrls : undefined,
+      files: allAudioUrls.length > 0 ? allAudioUrls : undefined, // Store audio files in 'files' array
+      transcript: finalTranscriptUrl,
+      tasks: tasks && tasks.length > 0 ? tasks : undefined,
+    });
+    currentStep++;
+    onProgress?.(100);
+
+    showSuccess('Content updated successfully!');
+    return contentId;
+  } catch (error) {
+    console.error('Error updating content:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch a single content document by ID
+ */
+export async function fetchContentById(contentId: string): Promise<ContentDocument | null> {
+  if (!DATABASE_ID) {
+    const error = new Error(
+      'VITE_APPWRITE_DATABASE_ID is not set in environment variables. Please add it to your .env file.'
+    );
+    console.error('Configuration Error:', error.message);
+    throw error;
+  }
+
+  if (!CONTENT_COLLECTION_ID) {
+    const error = new Error(
+      'VITE_APPWRITE_CONTENT_COLLECTION_ID is not set in environment variables. Please add it to your .env file.'
+    );
+    console.error('Configuration Error:', error.message);
+    throw error;
+  }
+
+  try {
+    const response = await tablesDB.getRow({
+      databaseId: DATABASE_ID,
+      tableId: CONTENT_COLLECTION_ID,
+      rowId: contentId,
+    });
+
+    return response as unknown as ContentDocument;
+  } catch (error) {
+    console.error('Error fetching content:', error);
+    showAppwriteError(error);
+    throw error;
+  }
 }
 
 /**

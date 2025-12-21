@@ -3,7 +3,6 @@ import CloseIcon from '../assets/icons/close';
 import EyeIcon from '../assets/icons/eye';
 import EyeClosedIcon from '../assets/icons/eye-closed';
 import CheckSmallIcon from '../assets/icons/check-small';
-import { Button } from './Button';
 
 interface ValidationRule {
   id: string;
@@ -172,30 +171,22 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
         <div className="flex flex-col gap-6">
           {/* Current Password Field */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-end justify-between">
-              <label
-                htmlFor="current-password"
-                className="text-white text-[14px] leading-[20px]"
-                style={{ fontFamily: 'Roboto, sans-serif' }}
-              >
-                Current Password
-              </label>
-              <button
-                onClick={onForgotPassword}
-                className="text-[#965cdf] text-[14px] leading-[24px] hover:opacity-70 transition"
-                style={{ fontFamily: 'Roboto, sans-serif' }}
-              >
-                Forgot Password?
-              </button>
-            </div>
+            <label
+              htmlFor="current-password"
+              className="text-white text-[14px] leading-[20px]"
+              style={{ fontFamily: 'Roboto, sans-serif' }}
+            >
+              Current Password
+            </label>
             <div className="relative">
               <input
                 id="current-password"
                 type={showCurrentPassword ? 'text' : 'password'}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="verysecure&S3CR3T"
+                placeholder="Enter password"
                 className="w-full h-[56px] px-4 pr-12 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] text-white font-lato text-[16px] leading-[24px] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                style={currentPassword.length > 0 && !showNewPassword ? { letterSpacing: '0.2em' } : {}}
               />
               <button
                 type="button"
@@ -227,8 +218,9 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="•••••••••"
+                placeholder="Choose password"
                 className="w-full h-[56px] px-4 pr-12 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] text-white font-lato text-[16px] leading-[24px] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                style={newPassword.length > 0 && !showNewPassword ? { letterSpacing: '0.2em' } : {}}
               />
               <button
                 type="button"
@@ -260,12 +252,13 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="MoreSecure4Sure!"
+                placeholder="Re-enter password"
                 className={`w-full h-[56px] px-4 pr-12 bg-[#131313] border rounded-[16px] text-white font-lato text-[16px] leading-[24px] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                   confirmPassword && !getValidationStatus(validationRules[3])
                     ? 'border-[#965cdf]'
                     : 'border-[rgba(255,255,255,0.25)]'
                 }`}
+                style={confirmPassword.length > 0 && !showNewPassword ? { letterSpacing: '0.2em' } : {}}
               />
               <button
                 type="button"
@@ -289,19 +282,17 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               return (
                 <div key={rule.id} className="flex items-center gap-3">
                   <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                    {isValid && (
+                    {isValid ? (
                       <CheckSmallIcon
                         width={16}
                         height={16}
                         color="#965cdf"
                       />
-                    )}
+                    ): <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-[#8f8f8f]"></div>}
                   </div>
                   <p
-                    className={`text-[14px] leading-[24px] ${
-                      isValid ? 'text-white' : 'text-[#8f8f8f]'
-                    }`}
-                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                    className="text-[14px] leading-[24px]"
+                    style={{ fontFamily: 'Roboto, sans-serif', color: isValid ? '#fff' : '#8f8f8f' }}
                   >
                     {rule.label}
                   </p>
@@ -313,21 +304,20 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
         {/* Buttons */}
         <div className="flex gap-4">
-          <Button
+          <button
             onClick={handleSave}
-            className="flex-1"
+            className="flex-1 h-[56px] rounded-[12px] bg-[#965CDF] text-white hover:bg-[#8549c9] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium text-[16px] font-roboto"
             disabled={!currentPassword || !newPassword || !allValidationsPass || isLoading}
           >
             {isLoading ? 'Saving...' : 'Save Changes'}
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={onClose}
-            variant="ghost"
-            className="flex-1 border-[#965cdf] text-white"
+            className="flex-1 h-[56px] rounded-[12px] bg-[#131313] border border-[#965cdf] text-white hover:bg-[#1a1a1a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium text-[16px] font-roboto"
             disabled={isLoading}
           >
             Cancel
-          </Button>
+          </button>
         </div>
       </div>
     </div>

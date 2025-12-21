@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import CloseIcon from '../assets/icons/close';
 import EyeIcon from '../assets/icons/eye';
 import EyeClosedIcon from '../assets/icons/eye-closed';
-import { Button } from './Button';
 
 interface ChangePhoneNumberModalProps {
   isOpen: boolean;
@@ -145,7 +144,7 @@ export const ChangePhoneNumberModal: React.FC<ChangePhoneNumberModalProps> = ({
                 setPhoneNumber(e.target.value);
                 setError('');
               }}
-              placeholder="(323) 456-7899"
+              placeholder="(123) 456-7890"
               className="w-full h-[56px] px-4 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] text-white font-lato text-[16px] leading-[24px] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               disabled={isLoading}
             />
@@ -198,7 +197,7 @@ export const ChangePhoneNumberModal: React.FC<ChangePhoneNumberModalProps> = ({
                   setPassword(e.target.value);
                   setError('');
                 }}
-                placeholder="•••••••••"
+                placeholder="• • • • • • • •"
                 className="w-full h-[56px] px-4 pr-12 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] text-white font-lato text-[16px] leading-[24px] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 disabled={isLoading}
               />
@@ -220,21 +219,20 @@ export const ChangePhoneNumberModal: React.FC<ChangePhoneNumberModalProps> = ({
 
         {/* Buttons */}
         <div className="flex gap-4">
-          <Button
+          <button
             onClick={handleSave}
-            className="flex-1"
+            className="flex-1 h-[56px] rounded-[12px] bg-[#965CDF] text-white hover:bg-[#8549c9] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium text-[16px] font-roboto"
             disabled={!phoneNumber.trim() || !password || isLoading}
           >
             {isLoading ? 'Saving...' : 'Save Changes'}
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={onClose}
-            variant="ghost"
-            className="flex-1 border-[#965cdf] text-white"
+            className="flex-1 h-[56px] rounded-[12px] bg-[#131313] border border-[#965cdf] text-white hover:bg-[#1a1a1a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium text-[16px] font-roboto"
             disabled={isLoading}
           >
             Cancel
-          </Button>
+          </button>
         </div>
       </div>
     </div>

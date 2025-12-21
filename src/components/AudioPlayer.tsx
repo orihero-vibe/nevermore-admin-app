@@ -7,7 +7,8 @@ import { audioManager } from '../lib/audioManager';
 
 export interface AudioPlayerProps {
   label: string;
-  file: File;
+  file?: File;
+  url?: string;
   onRemove?: () => void;
   className?: string;
 }
@@ -15,6 +16,7 @@ export interface AudioPlayerProps {
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   label,
   file,
+  url,
   onRemove,
   className = '',
 }) => {
@@ -30,24 +32,42 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const audioRef = useRef<HTMLAudioElement>(null);
   const timeUpdateIntervalRef = useRef<number | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
-  // Create object URL when file changes
+  // Create object URL when file changes, or use provided URL
   useEffect(() => {
-    if (!file) return;
+    if (file) {
+      const objectUrl = URL.createObjectURL(file);
+      objectUrlRef.current = objectUrl;
+      setAudioUrl(objectUrl);
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+      setIsLoading(true);
+      setError(null);
 
-    const url = URL.createObjectURL(file);
-    setAudioUrl(url);
-    setCurrentTime(0);
-    setDuration(0);
-    setIsPlaying(false);
-    setIsLoading(true);
-    setError(null);
+      return () => {
+        URL.revokeObjectURL(objectUrl);
+        audioManager.unregister(playerId);
+      };
+    } else if (url) {
+      setAudioUrl(url);
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+      setIsLoading(true);
+      setError(null);
 
-    return () => {
-      URL.revokeObjectURL(url);
-      audioManager.unregister(playerId);
-    };
-  }, [file, playerId]);
+      return () => {
+        audioManager.unregister(playerId);
+      };
+    } else {
+      setAudioUrl(null);
+      return () => {
+        audioManager.unregister(playerId);
+      };
+    }
+  }, [file, url, playerId]);
 
   // Register audio element with manager and set up listeners
   useEffect(() => {
@@ -341,7 +361,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     };
   }, [isSeeking, duration]);
 
-  if (!file) {
+  if (!file && !url) {
     return null;
   }
 
@@ -359,7 +379,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         </p>
       )}
       <div className="flex gap-4 items-center w-full">
-        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] px-4 py-2 flex flex-1 gap-4 items-center min-w-0">
+        <div className="backdrop-blur-[20px] bg-[rgba(255,255,255,0.07)] rounded-[16px] px-4 py-2 flex flex-1 gap-4 items-center min-w-0">
           <button
             onClick={togglePlay}
             disabled={!audioUrl || !!error}
@@ -367,9 +387,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <PauseIcon width={24} height={24} color="#fff" />
+              <PauseIcon width={32} height={32} color="#fff" />
             ) : (
-              <PlayIcon width={24} height={24} color="#fff" />
+              <PlayIcon width={32} height={32} color="#fff" />
             )}
           </button>
           <p

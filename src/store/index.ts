@@ -11,9 +11,11 @@ interface AppState {
   
   // Auth state
   user: User | null;
+  appwriteUser: Models.User<Models.Preferences> | null; // Keep full Appwrite user for Settings page
   session: Models.Session | null;
   isLoading: boolean;
   error: string | null;
+  isAuthChecked: boolean; // Track if we've checked auth
   
   // Auth actions
   signIn: (email: string, password: string) => Promise<void>;
@@ -22,7 +24,7 @@ interface AppState {
   clearError: () => void;
 }
 
-export const useStore = create<AppState>((set,) => ({
+export const useStore = create<AppState>((set, get) => ({
   // Sidebar state
   sidebarOpen: true,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -30,9 +32,11 @@ export const useStore = create<AppState>((set,) => ({
   
   // Auth state
   user: null,
+  appwriteUser: null,
   session: null,
   isLoading: false,
   error: null,
+  isAuthChecked: false,
   
   // Auth actions
   signIn: async (email: string, password: string) => {
@@ -43,7 +47,7 @@ export const useStore = create<AppState>((set,) => ({
       
       if (appwriteUser) {
         const user = authService.mapAppwriteUserToUser(appwriteUser);
-        set({ user, session, isLoading: false, error: null });
+        set({ user, appwriteUser, session, isLoading: false, error: null });
       } else {
         set({ isLoading: false, error: 'Failed to get user information' });
       }
@@ -70,15 +74,21 @@ export const useStore = create<AppState>((set,) => ({
     try {
       await authService.signOut();
       // Clear auth state after successful sign out
-      set({ user: null, session: null, isLoading: false, error: null });
+      set({ user: null, appwriteUser: null, session: null, isLoading: false, error: null, isAuthChecked: false });
     } catch {
       // Even if sign out fails (e.g., already signed out), clear the local state
       // This ensures the UI reflects the signed-out state
-      set({ user: null, session: null, isLoading: false, error: null });
+      set({ user: null, appwriteUser: null, session: null, isLoading: false, error: null, isAuthChecked: false });
     }
   },
   
   checkAuth: async () => {
+    // Prevent duplicate calls - if already loading or already checked, skip
+    const { isLoading, isAuthChecked } = get();
+    if (isLoading || isAuthChecked) {
+      return;
+    }
+    
     set({ isLoading: true, error: null });
     try {
       const session = await authService.getCurrentSession();
@@ -86,20 +96,20 @@ export const useStore = create<AppState>((set,) => ({
         const appwriteUser = await authService.getCurrentUser();
         if (appwriteUser) {
           const user = authService.mapAppwriteUserToUser(appwriteUser);
-          set({ user, session, isLoading: false, error: null });
+          set({ user, appwriteUser, session, isLoading: false, error: null, isAuthChecked: true });
         } else {
           // No user found even though session exists - clear state
-          set({ user: null, session: null, isLoading: false, error: null });
+          set({ user: null, appwriteUser: null, session: null, isLoading: false, error: null, isAuthChecked: true });
         }
       } else {
         // No session exists - this is normal for unauthenticated users
         // Don't set an error, just clear the auth state
-        set({ user: null, session: null, isLoading: false, error: null });
+        set({ user: null, appwriteUser: null, session: null, isLoading: false, error: null, isAuthChecked: true });
       }
     } catch (error: unknown) {
       // Only set error for unexpected errors
       console.error("Unexpected error checking auth:", error);
-      set({ user: null, session: null, isLoading: false, error: null });
+      set({ user: null, appwriteUser: null, session: null, isLoading: false, error: null, isAuthChecked: true });
     }
   },
   

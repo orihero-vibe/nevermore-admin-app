@@ -8,8 +8,9 @@ import type { Column } from '../components/DataTable';
 import { Pagination } from '../components/Pagination';
 import { Button } from '../components/Button';
 import { fetchContent, type ContentDocument } from '../lib/content';
-import { fetchCategories, getCategoryName, type Category } from '../lib/categories';
+import { getCategoryName, type Category } from '../lib/categories';
 import { showAppwriteError } from '../lib/notifications';
+import { useCategoriesStore } from '../store/categoriesStore';
 
 interface ContentItem extends Record<string, unknown> {
   id: string;
@@ -64,20 +65,21 @@ function mapContentToItem(
 
 
 const roleOptions: SelectOption[] = [
-  { value: '', label: 'All Roles' },
+  { value: '', label: 'Roles' },
   { value: 'support', label: 'Support' },
   { value: 'recovery', label: 'Recovery' },
   { value: 'prevention', label: 'Prevention' },
 ];
 
 const typeOptions: SelectOption[] = [
-  { value: '', label: 'All Types' },
+  { value: '', label: 'Types' },
   { value: '40-temptations', label: '40 Temptations' },
   { value: '40-day-journey', label: '40 Day Journey' },
 ];
 
 export const ContentManagement = () => {
   const navigate = useNavigate();
+  const { categories, loadCategories } = useCategoriesStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -89,22 +91,12 @@ export const ContentManagement = () => {
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch categories on mount
+  // Fetch categories on mount (only once, centrally managed)
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const fetchedCategories = await fetchCategories();
-        setCategories(fetchedCategories);
-      } catch (error) {
-        console.error('Failed to fetch categories:', error);
-        // Continue without categories - content will still load
-      }
-    };
     loadCategories();
-  }, []);
+  }, [loadCategories]);
 
   // Debounce search query (300ms delay)
   useEffect(() => {
@@ -161,7 +153,7 @@ export const ContentManagement = () => {
           debouncedSearchQuery || undefined,
           Object.keys(filters).length > 0 ? filters : undefined
         );
-
+        
         // Map documents to display items
         const mappedItems = result.documents.map((doc) =>
           mapContentToItem(doc, categories)
@@ -181,6 +173,9 @@ export const ContentManagement = () => {
     };
 
     loadContent();
+    // Note: categories is intentionally NOT in the dependency array
+    // We use it for mapping, but don't need to refetch content when categories change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentPage,
     itemsPerPage,
@@ -188,7 +183,6 @@ export const ContentManagement = () => {
     selectedCategory,
     selectedRole,
     selectedType,
-    categories,
   ]);
 
   // Handle ESC key to close modal
@@ -213,7 +207,7 @@ export const ContentManagement = () => {
 
   // Update category options when categories are loaded
   const categoryOptions: SelectOption[] = useMemo(() => [
-    { value: '', label: 'All Categories' },
+    { value: '', label: 'Categories' },
     ...categories.map((cat) => ({
       value: cat.$id,
       label: getCategoryName(cat),
@@ -264,7 +258,7 @@ export const ContentManagement = () => {
       {/* Header Controls */}
       <div className="mb-6 flex flex-wrap gap-4 items-center">
         {/* Search Bar */}
-        <div className="flex-1 min-w-[300px]">
+        <div className="flex-1 w-[250px]">
           <SearchBar
             placeholder="Search"
             value={searchQuery}
@@ -275,7 +269,7 @@ export const ContentManagement = () => {
         </div>
 
         {/* Filter Dropdowns */}
-        <div className="w-[168px]">
+        <div className="w-[200px]">
           <Select
             options={categoryOptions}
             value={selectedCategory}
@@ -287,7 +281,7 @@ export const ContentManagement = () => {
           />
         </div>
 
-        <div className="w-[128px]">
+        <div className="w-[160px]">
           <Select
             options={roleOptions}
             value={selectedRole}
@@ -299,7 +293,7 @@ export const ContentManagement = () => {
           />
         </div>
 
-        <div className="w-[128px]">
+        <div className="w-[160px]">
           <Select
             options={typeOptions}
             value={selectedType}
@@ -312,7 +306,7 @@ export const ContentManagement = () => {
         </div>
 
         {/* Upload Button */}
-        <Button className="w-[208px]" onClick={() => setIsUploadModalOpen(true)}>
+        <Button className="w-[208px] text-white bg-[#965cdf]" variant="primary" onClick={() => setIsUploadModalOpen(true)}>
           Upload New Content
         </Button>
       </div>
@@ -383,7 +377,7 @@ export const ContentManagement = () => {
                 className="h-[48px] w-full"
                 onClick={() => {
                   setIsUploadModalOpen(false);
-                  navigate('/content-management/temptation-details');
+                  navigate('/content-management/create-40-temptations');
                 }}
               >
                 40 Temptations

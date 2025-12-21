@@ -52,9 +52,9 @@ export const ForgotPassword = () => {
     >
       {/* Form Container */}
       <div className="relative z-10 w-full max-w-md mx-4">
-        <div className="bg-[rgba(255, 255, 255, 0.75)] backdrop-blur-lg rounded-2xl shadow-2xl p-8 border-gray-700/50">
+        <div className="bg-[rgba(255, 255, 255, 0.07)] backdrop-blur-lg rounded-2xl shadow-2xl p-8 border-gray-700/50">
           {/* Title */}
-          <h1 className="text-3xl font-normal text-white mb-4 tracking-wide">
+          <h1 className="text-2xl font-normal text-white mb-4 tracking-wide">
             Reset Password
           </h1>
 
@@ -96,7 +96,8 @@ export const ForgotPassword = () => {
           <div className="mt-6 text-center">
             <Link
               to="/signin"
-              className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium"
+              className="text-sm transition-colors"
+              style={{ color: 'rgba(150, 92, 223, 1)' }}
             >
               Return to Sign In
             </Link>

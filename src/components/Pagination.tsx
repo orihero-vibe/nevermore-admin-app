@@ -151,7 +151,7 @@ export const Pagination: React.FC<PaginationProps> = ({
               key={page}
               type="button"
               onClick={() => onPageChange(page)}
-              className={`w-10 h-10 flex items-center justify-center transition ${
+              className={`w-10 h-10 flex items-center justify-center transition cursor-pointer ${
                 currentPage === page
                   ? 'bg-[#965cdf] text-white rounded-[12px]'
                   : 'text-[#8f8f8f] hover:text-white hover:bg-gray-800 rounded-[6px]'

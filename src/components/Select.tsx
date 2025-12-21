@@ -37,7 +37,7 @@ export const Select: React.FC<SelectProps> = ({
     };
   }, []);
 
-  const selectedOption = options.find((opt) => opt.value === value);
+  const selectedOption = value && value !== '' ? options.find((opt) => opt.value === value) : null;
 
   const handleSelect = (optionValue: string) => {
     onChange?.(optionValue);
@@ -51,9 +51,7 @@ export const Select: React.FC<SelectProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className="w-full h-[56px] px-4 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] flex items-center justify-between gap-3 hover:bg-gray-800 transition focus:outline-none focus:ring-2 focus:ring-purple-500"
       >
-        <span className={`font-lato text-[16px] leading-[24px] truncate flex-1 text-left ${
-          selectedOption ? 'text-white' : 'text-[#616161]'
-        }`}>
+        <span className={`font-lato text-[16px] leading-[24px] truncate flex-1 text-left ${selectedOption ? 'text-white' : 'text-[#616161]'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDownIcon

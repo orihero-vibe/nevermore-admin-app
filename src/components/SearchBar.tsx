@@ -20,7 +20,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <div className={`relative ${className}`}>
       <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
-        <SearchIcon width={24} height={24} color="#8F8F8F" />
+        <SearchIcon width={24} height={24} color="#616161" />
       </div>
       <input
         type="text"

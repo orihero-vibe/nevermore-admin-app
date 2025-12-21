@@ -15,10 +15,19 @@ interface UserProfile {
   [key: string]: unknown;
 }
 
+// Cache for user profiles to avoid repeated API calls
+const userProfileCache = new Map<string, UserProfile | null>();
+
 /**
  * Get user profile from user_profiles collection by auth_id
+ * Results are cached to avoid repeated API calls
  */
 const getUserProfile = async (authId: string): Promise<UserProfile | null> => {
+  // Check cache first
+  if (userProfileCache.has(authId)) {
+    return userProfileCache.get(authId) || null;
+  }
+
   if (!DATABASE_ID || !USER_PROFILES_COLLECTION_ID) {
     console.error('Database ID or User Profiles Collection ID not configured');
     return null;
@@ -33,14 +42,25 @@ const getUserProfile = async (authId: string): Promise<UserProfile | null> => {
       ],
     });
 
-    if (response.rows && response.rows.length > 0) {
-      return response.rows[0] as unknown as UserProfile;
-    }
-    return null;
+    const profile = response.rows && response.rows.length > 0 
+      ? (response.rows[0] as unknown as UserProfile)
+      : null;
+    
+    // Cache the result
+    userProfileCache.set(authId, profile);
+    
+    return profile;
   } catch (error: unknown) {
     console.error('Error fetching user profile:', error);
     return null;
   }
+};
+
+/**
+ * Clear user profile cache (call on sign out)
+ */
+const clearUserProfileCache = () => {
+  userProfileCache.clear();
 };
 
 /**
@@ -157,16 +177,22 @@ export const getCurrentUser =
 export const signOut = async (): Promise<void> => {
   try {
     await account.deleteSession({sessionId: "current"});
+    // Clear user profile cache on sign out
+    clearUserProfileCache();
   } catch (error: unknown) {
     // If user is already signed out (401), that's fine - don't show error
     // For other errors, log them but don't show notification (user action is already handled)
     if (isUnauthorizedError(error)) {
       // User is already signed out - this is expected and not an error
+      // Still clear cache
+      clearUserProfileCache();
       return;
     }
     // Log other errors but don't show notification (sign out should still proceed)
     console.error("Error signing out:", error);
     // Don't throw - we want to clear local state even if server sign out fails
+    // Clear cache anyway
+    clearUserProfileCache();
   }
 };
 
@@ -202,6 +228,13 @@ export const updatePasswordRecovery = async (
   password: string
 ): Promise<void> => {
   try {
+    // Clear any existing sessions before password reset to avoid conflicts
+    try {
+      await account.deleteSession({sessionId: "current"});
+    } catch {
+      // Ignore if no session exists
+    }
+    
     await account.updateRecovery({
       userId,
       secret,

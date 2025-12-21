@@ -5,6 +5,7 @@ import { Input } from '../components/Input';
 import { PasswordInput } from '../components/PasswordInput';
 import { Button } from '../components/Button';
 import { useStore } from '../store';
+import { getAppwriteErrorMessage } from '../lib/errorHandler';
 
 export const SignIn = () => {
   const [email, setEmail] = useState('');
@@ -31,17 +32,16 @@ export const SignIn = () => {
     }
   }, [location.state]);
 
-  // Clear errors when email/password changes
-  useEffect(() => {
-    if (localError || error) {
-      setLocalError('');
-      clearError();
-    }
-  }, [email, password]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Clear success message when user interacts with form (types or focuses)
+  // Clear errors and success message when user types (types or focuses)
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
+    // Clear errors and success message when user starts typing
+    if (localError) {
+      setLocalError('');
+    }
+    if (error) {
+      clearError();
+    }
     if (successMessage) {
       setSuccessMessage('');
     }
@@ -49,6 +49,13 @@ export const SignIn = () => {
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
+    // Clear errors and success message when user starts typing
+    if (localError) {
+      setLocalError('');
+    }
+    if (error) {
+      clearError();
+    }
     if (successMessage) {
       setSuccessMessage('');
     }
@@ -71,14 +78,13 @@ export const SignIn = () => {
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/content-management';
       navigate(from, { replace: true });
     } catch (error: unknown) {
-      // Get error message directly from Appwrite error
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string')
-        ? error.message
-        : (typeof error === 'string')
-        ? error
-        : 'Failed to sign in. Please check your credentials.';
+      // Use the error handler utility to extract the message
+      let errorMessage = getAppwriteErrorMessage(error);
+      
+      // If it's an invalid credentials error after password reset, provide helpful message
+      if (successMessage && errorMessage.toLowerCase().includes('invalid credentials')) {
+        errorMessage = 'Invalid credentials. If you just reset your password, please make sure you\'re using the NEW password you just created, not your old one.';
+      }
       
       // Set local error to display in the form
       setLocalError(errorMessage);
@@ -150,14 +156,15 @@ export const SignIn = () => {
             <div className="flex justify-end">
               <Link
                 to="/forgot-password"
-                className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium"
+                className="text-sm hover:opacity-80 transition-opacity"
+                style={{ color: 'rgba(150, 92, 223, 1)' }}
               >
                 Forgot Password?
               </Link>
             </div>
 
             {/* Sign In Button */}
-            <Button type="submit" fullWidth disabled={isLoading}>
+            <Button type="submit" fullWidth disabled={isLoading} variant="primary" >
               {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>

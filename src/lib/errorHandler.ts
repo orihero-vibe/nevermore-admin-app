@@ -12,22 +12,36 @@ export const getAppwriteErrorMessage = (error: unknown): string => {
     return error.message || 'An error occurred';
   }
 
-  // Handle Appwrite error objects - just get the message
+  // Handle Appwrite error objects - check multiple possible locations
   if (typeof error === 'object') {
     const appwriteError = error as {
       message?: string;
       response?: {
         message?: string;
+        data?: {
+          message?: string;
+        };
+      };
+      data?: {
+        message?: string;
       };
     };
 
-    // Try to get message from various locations
+    // Try to get message from various locations in order of priority
     if (appwriteError.message) {
       return appwriteError.message;
     }
 
     if (appwriteError.response?.message) {
       return appwriteError.response.message;
+    }
+
+    if (appwriteError.response?.data?.message) {
+      return appwriteError.response.data.message;
+    }
+
+    if (appwriteError.data?.message) {
+      return appwriteError.data.message;
     }
   }
 

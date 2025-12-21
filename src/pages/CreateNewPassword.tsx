@@ -84,8 +84,9 @@ export const CreateNewPassword = () => {
       // Navigate to sign in page after successful password reset
       navigate('/signin', { 
         state: { 
-          message: 'Password reset successful. Please sign in with your new password.' 
-        } 
+          message: 'Password reset successful. Please sign in with your NEW password (not your old one).' 
+        },
+        replace: true // Replace history to prevent going back to reset page
       });
     } catch (error: unknown) {
       // Get error message directly from Appwrite error
@@ -172,13 +173,13 @@ export const CreateNewPassword = () => {
                   return (
                     <div key={rule.id} className="flex items-center gap-3">
                       <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                        {isValid && (
+                        {isValid ? (
                           <CheckSmallIcon
                             width={16}
                             height={12}
                             color="#965cdf"
                           />
-                        )}
+                        ): <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-[#8f8f8f]"></div>}
                       </div>
                       <p
                         className={`text-sm font-normal ${
@@ -193,7 +194,7 @@ export const CreateNewPassword = () => {
               </div>
 
               {/* Submit Button */}
-              <Button type="submit" fullWidth disabled={isLoading || !userId || !secret}>
+              <Button type="submit" fullWidth disabled={isLoading || !userId || !secret || confirmPassword !== newPassword || !confirmPassword}>
                 {isLoading ? 'Updating Password...' : 'Submit'}
               </Button>
             </form>

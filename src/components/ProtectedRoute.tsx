@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 
@@ -7,19 +6,13 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, isLoading, checkAuth } = useStore();
+  const { user, isLoading } = useStore();
   const location = useLocation();
-  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
-  // Ensure auth is checked on mount (only once per route)
-  useEffect(() => {
-    if (!hasCheckedAuth) {
-      checkAuth().finally(() => setHasCheckedAuth(true));
-    }
-  }, [checkAuth, hasCheckedAuth]);
+  // No need to call checkAuth here - App.tsx already handles it on mount
 
   // Show loading state while checking authentication
-  if (isLoading || !hasCheckedAuth) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-950">
         <div className="flex flex-col items-center gap-4">

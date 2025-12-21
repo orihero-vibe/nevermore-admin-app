@@ -4,9 +4,10 @@ import EditIcon from '../assets/icons/edit';
 import { ChangeEmailModal } from '../components/ChangeEmailModal';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { ChangePhoneNumberModal } from '../components/ChangePhoneNumberModal';
-import { getCurrentUser, updateEmail, updatePassword, updatePhone } from '../lib/auth';
-import { showSuccess, showAppwriteError } from '../lib/notifications';
+import { updateEmail, updatePassword, updatePhone } from '../lib/auth';
+import { showSuccess } from '../lib/notifications';
 import type { Models } from 'appwrite';
+import { useStore } from '../store';
 
 // Helper function to format phone number for display
 const formatPhoneNumber = (phone: string | undefined): string => {
@@ -33,6 +34,7 @@ const formatDate = (dateString: string | undefined): string => {
 
 export const Settings = () => {
   const navigate = useNavigate();
+  const { appwriteUser: storeAppwriteUser, checkAuth } = useStore();
   const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -42,22 +44,13 @@ export const Settings = () => {
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [isSavingPhone, setIsSavingPhone] = useState(false);
 
-  // Fetch current user data on mount
+  // Use store's appwriteUser data (already fetched by App.tsx)
   useEffect(() => {
-    const fetchUser = async () => {
-      setIsLoading(true);
-      try {
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
-      } catch (error) {
-        showAppwriteError(error, { skipUnauthorized: true });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, []);
+    if (storeAppwriteUser) {
+      setUser(storeAppwriteUser);
+    }
+    setIsLoading(false);
+  }, [storeAppwriteUser]);
 
   const handleEmailEdit = () => {
     setIsEmailModalOpen(true);
@@ -76,6 +69,8 @@ export const Settings = () => {
     try {
       const updatedUser = await updateEmail(newEmail, currentPassword);
       setUser(updatedUser);
+      // Refresh auth state in store
+      await checkAuth();
       showSuccess('Email updated successfully');
       setIsEmailModalOpen(false);
     } catch {
@@ -105,6 +100,8 @@ export const Settings = () => {
     try {
       const updatedUser = await updatePhone(newPhoneNumber, password);
       setUser(updatedUser);
+      // Refresh auth state in store
+      await checkAuth();
       showSuccess('Phone number updated successfully');
       setIsPhoneModalOpen(false);
     } catch {
@@ -149,7 +146,7 @@ export const Settings = () => {
       </h1>
 
       {/* Profile Card */}
-      <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8 w-[536px] flex flex-col items-center gap-16">
+      <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8 w-[536px] mx-auto flex flex-col items-center gap-16">
         {/* Profile Section */}
         <div className="flex flex-col items-center gap-2">
           {/* Avatar with Online Status */}
@@ -210,7 +207,7 @@ export const Settings = () => {
                   </p>
                   <button
                     onClick={handleEmailEdit}
-                    className="absolute right-4 p-1 hover:opacity-70 transition"
+                    className="absolute right-4 p-1 hover:opacity-70 transition cursor-pointer"
                     aria-label="Edit email"
                     disabled={isSavingEmail}
                   >
@@ -236,11 +233,11 @@ export const Settings = () => {
                   </p>
                   <button
                     onClick={handlePhoneEdit}
-                    className="absolute right-4 p-1 hover:opacity-70 transition"
+                    className="absolute right-4 p-1 hover:opacity-70 transition cursor-pointer"
                     aria-label="Edit phone number"
                     disabled={isSavingPhone}
                   >
-                    <EditIcon width={24} height={24} color="#fff" />
+                    <EditIcon width={20} height={20} color="#fff" />
                   </button>
                 </div>
               </div>
@@ -258,11 +255,11 @@ export const Settings = () => {
               <div className="relative">
                 <div className="w-full h-[56px] px-4 pr-12 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] flex items-center relative">
                   <p className="flex-1 text-white font-lato text-[16px] leading-[24px]">
-                    •••••••••
+                    • • • • • • • •
                   </p>
                   <button
                     onClick={handlePasswordEdit}
-                    className="absolute right-4 p-1 hover:opacity-70 transition"
+                    className="absolute right-4 p-1 hover:opacity-70 transition cursor-pointer"
                     aria-label="Edit password"
                     disabled={isSavingPassword}
                   >

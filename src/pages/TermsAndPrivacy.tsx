@@ -98,6 +98,7 @@ export const TermsAndPrivacy = () => {
       <div className="flex justify-start">
         <Button 
           className="w-[208px]" 
+          variant="primary"
           onClick={handleSave}
           disabled={isSaving || isLoading}
         >

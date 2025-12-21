@@ -6,7 +6,7 @@ import { FileUploadPopup, type UploadFile } from '../components/FileUploadPopup'
 import ChevronLeftIcon from '../assets/icons/chevron-left';
 import PlusIcon from '../assets/icons/plus';
 import CloseIcon from '../assets/icons/close';
-import { publishContent } from '../lib/content';
+import { publishContent, updateContentWithFiles, fetchContentById, type ContentDocument } from '../lib/content';
 import { showAppwriteError } from '../lib/notifications';
 
 interface JourneyData {
@@ -27,32 +27,58 @@ export const Journey40Day = () => {
   const [contentTitle, setContentTitle] = useState('');
   const [day, setDay] = useState<number | ''>('');
   const [tasks, setTasks] = useState<string[]>(['']);
-  const [showAudioPlayer, setShowAudioPlayer] = useState(false);
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadedAudioFiles, setUploadedAudioFiles] = useState<File[]>([]);
+  const [uploadedAudioUrls, setUploadedAudioUrls] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
+  const [saveProgress, setSaveProgress] = useState(0);
+  const [originalContentData, setOriginalContentData] = useState<ContentDocument | null>(null);
+  const [originalTitle, setOriginalTitle] = useState('');
+  const [originalDay, setOriginalDay] = useState<number | ''>('');
+  const [originalTasks, setOriginalTasks] = useState<string[]>([]);
 
   // Load data when component mounts or journeyData changes
   useEffect(() => {
-    if (journeyData) {
-      setContentTitle(journeyData.title || '');
-      setDay(journeyData.day !== undefined ? journeyData.day : '');
-      if (journeyData.tasks && journeyData.tasks.length > 0) {
-        setTasks(journeyData.tasks);
-      } else {
-        setTasks(['']);
+    const loadContentData = async () => {
+      if (journeyData?.id && !originalContentData) {
+        try {
+          const contentDoc = await fetchContentById(journeyData.id);
+          if (contentDoc) {
+            setOriginalContentData(contentDoc);
+            
+            // Load audio files from URLs
+            if (contentDoc.files && contentDoc.files.length > 0) {
+              setUploadedAudioUrls(contentDoc.files);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading content data:', error);
+        }
       }
-      // Show audio player if the journey has audio
-      if (journeyData.hasAudio) {
-        setShowAudioPlayer(true);
-        // Create a dummy file for display purposes
-        // In a real app, you'd fetch the actual audio file
-        const dummyAudioFile = new File([''], 'audio.mp3', { type: 'audio/mpeg' });
-        setUploadedFiles([dummyAudioFile]);
+
+      if (journeyData) {
+        const title = journeyData.title || '';
+        setContentTitle(title);
+        setOriginalTitle(title);
+        
+        const dayValue = journeyData.day !== undefined ? journeyData.day : '';
+        setDay(dayValue);
+        setOriginalDay(dayValue);
+        
+        if (journeyData.tasks && journeyData.tasks.length > 0) {
+          setTasks(journeyData.tasks);
+          setOriginalTasks([...journeyData.tasks]);
+        } else {
+          setTasks(['']);
+          setOriginalTasks([]);
+        }
       }
-    }
-  }, [journeyData]);
+    };
+
+    loadContentData();
+  }, [journeyData, originalContentData]);
 
   const handleTaskChange = (index: number, value: string) => {
     const newTasks = [...tasks];
@@ -82,8 +108,7 @@ export const Journey40Day = () => {
       .map((uf) => uf.file);
     
     if (audioFiles.length > 0) {
-      setUploadedFiles(audioFiles);
-      setShowAudioPlayer(true);
+      setUploadedAudioFiles((prev) => [...prev, ...audioFiles]);
       // If content title is empty, suggest a title from the first file
       if (!contentTitle.trim() && audioFiles[0]) {
         const fileName = audioFiles[0].name;
@@ -96,6 +121,105 @@ export const Journey40Day = () => {
     setIsUploadPopupOpen(false);
   };
 
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = () => {
+    if (!journeyData?.id) return false;
+    
+    const titleChanged = contentTitle.trim() !== originalTitle.trim();
+    const dayChanged = day !== originalDay;
+    const tasksChanged = JSON.stringify(tasks.filter(t => t.trim())) !== JSON.stringify(originalTasks.filter(t => t.trim()));
+    
+    // Check if new files were uploaded
+    const newAudioUploaded = uploadedAudioFiles.length > 0;
+    
+    // Check if existing files were removed
+    const audioRemoved = originalContentData?.files && originalContentData.files.length > 0 && uploadedAudioFiles.length === 0 && uploadedAudioUrls.length === 0;
+    
+    const filesChanged = newAudioUploaded || audioRemoved;
+    
+    return titleChanged || dayChanged || tasksChanged || filesChanged;
+  };
+
+  const handleSave = async () => {
+    if (!journeyData?.id) {
+      showAppwriteError(new Error('Content ID is required to save changes'));
+      return;
+    }
+
+    // If there are no changes, don't do anything
+    if (!hasUnsavedChanges()) {
+      return;
+    }
+
+    // Validate required fields
+    if (!contentTitle.trim()) {
+      showAppwriteError(new Error('Content title is required'));
+      return;
+    }
+
+    // Check if we have at least one file uploaded (new or existing)
+    if (uploadedAudioFiles.length === 0 && uploadedAudioUrls.length === 0) {
+      showAppwriteError(new Error('Please upload at least one audio file'));
+      return;
+    }
+
+    // Filter out empty tasks
+    const validTasks = tasks.filter((task) => task.trim().length > 0);
+
+    setIsSaving(true);
+    setSaveProgress(0);
+
+    try {
+      // Update content (uploads new files and updates content document, preserving existing URLs)
+      await updateContentWithFiles(
+        journeyData.id,
+        {
+          title: contentTitle.trim(),
+          type: 'forty_day_journey',
+          day: day !== '' ? Number(day) : undefined,
+        },
+        [], // No images for 40-day journey
+        uploadedAudioFiles,
+        null, // No transcript for journey
+        validTasks.length > 0 ? validTasks : undefined,
+        (progress) => {
+          setSaveProgress(progress);
+        },
+        [], // No existing image URLs
+        uploadedAudioUrls, // Pass existing audio URLs
+        null // No transcript URL
+      );
+
+      // Reload content to get updated URLs
+      const updatedContent = await fetchContentById(journeyData.id);
+      if (updatedContent) {
+        setOriginalContentData(updatedContent);
+        
+        // Reload audio URLs
+        if (updatedContent.files && updatedContent.files.length > 0) {
+          setUploadedAudioUrls(updatedContent.files);
+        } else {
+          setUploadedAudioUrls([]);
+        }
+      }
+
+      // Update original values after successful save
+      setOriginalTitle(contentTitle);
+      setOriginalDay(day);
+      setOriginalTasks([...tasks]);
+      // Clear newly uploaded files (keep URLs)
+      setUploadedAudioFiles([]);
+      
+      // Navigate back to content management after successful save
+      navigate('/content-management');
+    } catch (error) {
+      console.error('Error saving content:', error);
+      // Error is already shown by updateContentWithFiles function
+      setIsSaving(false);
+      setSaveProgress(0);
+    }
+  };
+
   const handlePublish = async () => {
     // Validate required fields
     if (!contentTitle.trim()) {
@@ -104,7 +228,7 @@ export const Journey40Day = () => {
     }
 
     // Check if we have at least one file uploaded
-    if (uploadedFiles.length === 0) {
+    if (uploadedAudioFiles.length === 0) {
       showAppwriteError(new Error('Please upload at least one audio file'));
       return;
     }
@@ -131,7 +255,7 @@ export const Journey40Day = () => {
           day: day !== '' ? Number(day) : undefined, // Day number for 40-day journey
         },
         [], // No images for 40-day journey
-        uploadedFiles, // Audio files - uploaded to storage
+        uploadedAudioFiles, // Audio files - uploaded to storage
         null, // No transcript for journey
         validTasks.length > 0 ? validTasks : undefined, // Tasks array - stored in content document
         (progress) => {
@@ -149,51 +273,95 @@ export const Journey40Day = () => {
     }
   };
 
+  const handleDelete = () => {
+    // TODO: Implement delete functionality
+    console.log('Delete clicked');
+  };
+
   const handleCancel = () => {
     navigate('/content-management');
   };
 
   return (
-    <div className="bg-neutral-950 min-h-screen p-8">
-      {/* Header with Back Button and Title */}
-      <div className="flex gap-8 items-center mb-6">
-        <button
-          onClick={() => navigate('/content-management')}
-          className="flex items-center gap-1 text-[#965cdf] text-[12px] leading-[16px] font-roboto font-normal hover:opacity-80 transition"
-        >
-          <ChevronLeftIcon width={24} height={24} color="#965cdf" />
-          <span>Back</span>
-        </button>
-        <h2
-          className="text-white text-[24px] leading-normal font-cinzel font-normal whitespace-nowrap"
-        >
-          {isEditMode ? 'Edit 40-Day Journey' : 'Create 40-Day Journey'}
-        </h2>
+    <div className="bg-neutral-950 min-h-screen">
+      {/* Header with Back Button, Title, and Action Buttons */}
+      <div className="flex items-center justify-between px-8 pt-9">
+        <div className="flex items-center gap-8">
+          <button
+            onClick={() => navigate('/content-management')}
+            className="flex items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
+            style={{ fontFamily: 'Roboto, sans-serif' }}
+          >
+            <ChevronLeftIcon width={24} height={24} color="#965cdf" />
+            <span>Back</span>
+          </button>
+          <h1
+            className="text-white text-[24px] leading-[normal]"
+            style={{ fontFamily: 'Cinzel, serif', fontWeight: 400 }}
+          >
+            {isEditMode ? 'Content Details' : 'Upload New Journey'}
+          </h1>
+        </div>
+        {isEditMode && (
+          <div className="flex items-center gap-4">
+            <Button
+              className="w-[120px] h-[56px]"
+              onClick={handleSave}
+              disabled={isSaving || !journeyData?.id}
+            >
+              {isSaving ? `Saving... ${saveProgress}%` : hasUnsavedChanges() ? 'Save' : 'Edit'}
+            </Button>
+            {isSaving && saveProgress > 0 && saveProgress < 100 && (
+              <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+                <div
+                  className="bg-[#965cdf] h-full transition-all duration-300"
+                  style={{ width: `${saveProgress}%` }}
+                />
+              </div>
+            )}
+            <Button
+              variant="outline"
+              className="w-[120px] h-[56px]"
+              onClick={handleDelete}
+              disabled={isSaving}
+            >
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Main Content Card */}
-      <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8 flex flex-col gap-16 items-center">
+      {/* Main Content Area */}
+      <div className="px-8 pt-9 pb-8">
+        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8 flex flex-col gap-16 items-center">
         {/* Content Section */}
         <div className="flex gap-16 items-start w-full">
           {/* Left Section - Content Title and Audio */}
           <div className="flex-1 flex flex-col gap-10 items-end">
             {/* Content Title with Upload Button */}
-            <div className="flex gap-4 items-end w-full">
-              <div className="flex-1 flex flex-col gap-2">
-                <label className="text-white text-[14px] leading-[20px] font-roboto font-normal">
-                  Content Title
-                </label>
-                <input
-                  type="text"
-                  value={contentTitle}
-                  onChange={(e) => setContentTitle(e.target.value)}
-                  placeholder="Enter journey title (e.g., Day 1, Day 2)"
-                  className="h-[56px] bg-[#131313] border border-[#965cdf] rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf]"
-                />
+            <div className="flex items-end justify-between gap-4 w-full">
+              <div className="flex-1">
+                <div className="flex flex-col gap-2">
+                  <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                    Title
+                  </label>
+                  <input
+                    value={contentTitle}
+                    onChange={(e) => setContentTitle(e.target.value)}
+                    placeholder=" "
+                    className={`w-full ${isEditMode ? 'bg-transparent border-none' : 'h-[56px] bg-[#131313] border border-[#965cdf] rounded-[16px] px-4 focus:ring-2 focus:ring-[#965cdf]'} text-white focus:outline-none placeholder-[#616161]`}
+                    style={{ 
+                      fontFamily: 'Cinzel, serif', 
+                      fontWeight: 400,
+                      fontSize: '40px',
+                      lineHeight: 'normal'
+                    }}
+                  />
+                </div>
               </div>
               <Button
                 onClick={handleUploadFiles}
-                className="w-[184px] h-[56px] rounded-[12px]"
+                className="w-[120px] h-[56px]"
               >
                 Upload Files
               </Button>
@@ -211,21 +379,48 @@ export const Journey40Day = () => {
                 placeholder="Enter day number (e.g., 1, 2, 3)"
                 min="1"
                 max="40"
-                className="h-[56px] bg-[#131313] border border-[#965cdf] rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf]"
+                className="h-[56px] bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf]"
               />
             </div>
 
-            {/* Audio Player */}
-            {showAudioPlayer && uploadedFiles.length > 0 && (
-              <AudioPlayer
-                label="Main Content"
-                file={uploadedFiles[0]}
-                onRemove={() => {
-                  setShowAudioPlayer(false);
-                  setUploadedFiles([]);
-                }}
-                className="w-full"
-              />
+            {/* Audio Players */}
+            {(uploadedAudioFiles.length > 0 || uploadedAudioUrls.length > 0) && (
+              <div className="flex flex-col gap-4 w-full">
+                {/* Newly uploaded audio files */}
+                {uploadedAudioFiles.map((file, index) => {
+                  const audioIndex = index;
+                  return (
+                    <AudioPlayer
+                      key={`new-${file.name}-${index}`}
+                      label={audioIndex === 0 ? 'Main Content' : `Question ${audioIndex}`}
+                      file={file}
+                      onRemove={() => {
+                        setUploadedAudioFiles((prev) => {
+                          const newFiles = [...prev];
+                          newFiles.splice(index, 1);
+                          return newFiles;
+                        });
+                      }}
+                      className="w-full"
+                    />
+                  );
+                })}
+                {/* Existing audio URLs - display as AudioPlayer components */}
+                {uploadedAudioUrls.map((url, index) => {
+                  const audioIndex = uploadedAudioFiles.length + index;
+                  return (
+                    <AudioPlayer
+                      key={`existing-audio-${index}`}
+                      label={audioIndex === 0 ? 'Main Content' : `Question ${audioIndex}`}
+                      url={url}
+                      onRemove={() => {
+                        setUploadedAudioUrls((prev) => prev.filter((_, i) => i !== index));
+                      }}
+                      className="w-full"
+                    />
+                  );
+                })}
+              </div>
             )}
           </div>
 
@@ -286,31 +481,34 @@ export const Journey40Day = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-4 items-center justify-end w-full">
-          <button
-            onClick={handleCancel}
-            disabled={isPublishing}
-            className="w-[120px] h-[56px] rounded-[12px] border border-[#965cdf] text-white font-roboto font-medium text-[16px] leading-normal hover:bg-[rgba(150,92,223,0.1)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <Button
-            onClick={handlePublish}
-            className="w-[120px] h-[56px] rounded-[12px]"
-            disabled={isPublishing}
-          >
-            {isPublishing ? `Publishing... ${publishProgress}%` : 'Publish'}
-          </Button>
-          {isPublishing && publishProgress > 0 && publishProgress < 100 && (
-            <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
-              <div
-                className="bg-[#965cdf] h-full transition-all duration-300"
-                style={{ width: `${publishProgress}%` }}
-              />
-            </div>
-          )}
-        </div>
+        {/* Action Buttons - Only show for create mode */}
+        {!isEditMode && (
+          <div className="flex gap-4 items-center justify-end w-full">
+            <button
+              onClick={handleCancel}
+              disabled={isPublishing}
+              className="w-[120px] h-[56px] rounded-[12px] border border-[#965cdf] text-white font-roboto font-medium text-[16px] leading-normal hover:bg-[rgba(150,92,223,0.1)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+            <Button
+              onClick={handlePublish}
+              className="w-[120px] h-[56px] rounded-[12px]"
+              disabled={isPublishing}
+            >
+              {isPublishing ? `Publishing... ${publishProgress}%` : 'Publish'}
+            </Button>
+            {isPublishing && publishProgress > 0 && publishProgress < 100 && (
+              <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+                <div
+                  className="bg-[#965cdf] h-full transition-all duration-300"
+                  style={{ width: `${publishProgress}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       </div>
 
       {/* File Upload Popup */}

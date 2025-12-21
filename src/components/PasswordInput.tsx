@@ -28,7 +28,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
         <input
           id={inputId}
           type={showPassword ? 'text' : 'password'}
-          className={`w-full px-4 py-3 pr-12 bg-[#131313] border ${
+          className={`w-full h-[56px] px-4 pr-12 bg-[#131313] border ${
             error ? 'border-red-500' : 'border-[rgba(255,255,255,0.25)]'
           } rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition ${className}`}
           {...props}
@@ -36,7 +36,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors p-1"
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 transition-colors p-1"
           aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
           {showPassword ? (

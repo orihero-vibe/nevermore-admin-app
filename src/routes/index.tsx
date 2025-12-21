@@ -12,6 +12,7 @@ import { CreateNewPassword } from '../pages/CreateNewPassword';
 import { ContentManagement } from '../pages/ContentManagement';
 import { Journey40Day } from '../pages/Journey40Day';
 import { TemptationDetails } from '../pages/TemptationDetails';
+import { CreateTemptation } from '../pages/CreateTemptation';
 import { Settings } from '../pages/Settings';
 import { TermsAndPrivacy } from '../pages/TermsAndPrivacy';
 
@@ -120,7 +121,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'create-40-temptations',
-        element: <TemptationDetails />,
+        element: <CreateTemptation />,
       },
       {
         path: 'journey-40-day/:id?',
