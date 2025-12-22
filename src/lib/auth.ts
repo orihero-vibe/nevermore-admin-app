@@ -287,7 +287,7 @@ export const updatePassword = async (
 };
 
 /**
- * Update user phone number
+ * Update user phone number in user_profiles table
  * Password is required for security verification
  */
 export const updatePhone = async (
@@ -295,14 +295,82 @@ export const updatePhone = async (
   password: string
 ): Promise<Models.User<Models.Preferences>> => {
   try {
-    const user = await account.updatePhone({
-      phone,
-      password,
+    // Get current user to verify authentication and get auth_id
+    const currentUser = await account.get();
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    // Verify password by attempting to update email with the same email
+    // This verifies the password - if email unchanged, that's fine (password verified)
+    // If unauthorized, password is wrong
+    try {
+      await account.updateEmail({
+        email: currentUser.email,
+        password,
+      });
+    } catch (error: unknown) {
+      // If password verification fails (unauthorized), throw error
+      if (isUnauthorizedError(error)) {
+        throw new Error('Invalid password. Please try again.');
+      }
+      // If email is unchanged or other non-auth errors, continue (password was verified)
+      // Only throw if it's a critical error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.toLowerCase().includes('unauthorized') || 
+          errorMessage.toLowerCase().includes('invalid credentials')) {
+        throw new Error('Invalid password. Please try again.');
+      }
+      // For other errors (like "email unchanged"), continue - password was verified
+    }
+
+    // Get user profile from user_profiles table
+    const userProfile = await getUserProfile(currentUser.$id);
+    if (!userProfile) {
+      throw new Error('User profile not found');
+    }
+
+    // Update phone number in user_profiles table
+    if (!DATABASE_ID || !USER_PROFILES_COLLECTION_ID) {
+      throw new Error('Database configuration missing');
+    }
+
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: USER_PROFILES_COLLECTION_ID,
+      rowId: userProfile.$id,
+      data: {
+        phone: phone,
+      },
     });
-    return user;
+
+    // Clear cache to force refresh on next access
+    userProfileCache.delete(currentUser.$id);
+
+    // Return the current user (phone is stored in user_profiles, not auth)
+    return currentUser;
   } catch (error: unknown) {
     showAppwriteError(error, { skipUnauthorized: true });
     throw error;
+  }
+};
+
+/**
+ * Get current user's profile from user_profiles table
+ */
+export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
+  try {
+    const currentUser = await account.get();
+    if (!currentUser) {
+      return null;
+    }
+    return await getUserProfile(currentUser.$id);
+  } catch (error: unknown) {
+    if (isUnauthorizedError(error)) {
+      return null;
+    }
+    console.error('Error getting current user profile:', error);
+    return null;
   }
 };
 

@@ -257,8 +257,9 @@ export const Journey40Day = () => {
         [], // No images for 40-day journey
         uploadedAudioFiles, // Audio files - uploaded to storage
         null, // No transcript for journey
+        undefined, // No transcript files
         validTasks.length > 0 ? validTasks : undefined, // Tasks array - stored in content document
-        (progress) => {
+        (progress: number) => {
           setPublishProgress(progress);
         }
       );

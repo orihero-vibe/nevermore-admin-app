@@ -45,7 +45,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  onForgotPassword,
+  onForgotPassword: _onForgotPassword,
   isLoading = false,
 }) => {
   const [currentPassword, setCurrentPassword] = useState('');

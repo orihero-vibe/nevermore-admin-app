@@ -11,6 +11,47 @@ interface ChangePhoneNumberModalProps {
   isLoading?: boolean;
 }
 
+// Phone number masking helper - formats as (XXX) XXX-XXXX
+const formatPhoneNumber = (value: string): string => {
+  // Remove all non-digit characters
+  const digitsOnly = value.replace(/\D/g, '');
+  
+  // Limit to 10 digits for US phone numbers
+  const limitedDigits = digitsOnly.slice(0, 10);
+  
+  // Apply mask based on number of digits
+  if (limitedDigits.length === 0) {
+    return '';
+  } else if (limitedDigits.length <= 3) {
+    return `(${limitedDigits}`;
+  } else if (limitedDigits.length <= 6) {
+    return `(${limitedDigits.slice(0, 3)}) ${limitedDigits.slice(3)}`;
+  } else {
+    return `(${limitedDigits.slice(0, 3)}) ${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
+  }
+};
+
+// Phone number validation helper
+const validatePhoneNumber = (phone: string): { isValid: boolean; error?: string } => {
+  if (!phone.trim()) {
+    return { isValid: false, error: 'Please enter a phone number' };
+  }
+
+  // Remove all non-digit characters for validation
+  const digitsOnly = phone.replace(/\D/g, '');
+
+  // US format: exactly 10 digits
+  if (digitsOnly.length === 10) {
+    return { isValid: true };
+  }
+
+  // Invalid format
+  return {
+    isValid: false,
+    error: 'US phone number must be 10 digits (e.g., (123) 456-7890)',
+  };
+};
+
 export const ChangePhoneNumberModal: React.FC<ChangePhoneNumberModalProps> = ({
   isOpen,
   onClose,
@@ -18,7 +59,9 @@ export const ChangePhoneNumberModal: React.FC<ChangePhoneNumberModalProps> = ({
   onSave,
   isLoading = false,
 }) => {
-  const [phoneNumber, setPhoneNumber] = useState(currentPhoneNumber);
+  const [phoneNumber, setPhoneNumber] = useState(() => 
+    currentPhoneNumber ? formatPhoneNumber(currentPhoneNumber) : ''
+  );
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +69,9 @@ export const ChangePhoneNumberModal: React.FC<ChangePhoneNumberModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setPhoneNumber(currentPhoneNumber);
+      // Format the current phone number if it exists
+      const formatted = currentPhoneNumber ? formatPhoneNumber(currentPhoneNumber) : '';
+      setPhoneNumber(formatted);
       setPassword('');
       setShowPassword(false);
       setError('');
@@ -54,13 +99,16 @@ export const ChangePhoneNumberModal: React.FC<ChangePhoneNumberModalProps> = ({
   }, [isOpen, onClose, isLoading]);
 
   const handleSave = async () => {
-    if (!phoneNumber.trim()) {
-      setError('Please enter a phone number');
+    // Validate password
+    if (!password) {
+      setError('Please enter your password');
       return;
     }
 
-    if (!password) {
-      setError('Please enter your password');
+    // Validate phone number format
+    const phoneValidation = validatePhoneNumber(phoneNumber);
+    if (!phoneValidation.isValid) {
+      setError(phoneValidation.error || 'Please enter a valid phone number');
       return;
     }
 
@@ -141,10 +189,12 @@ export const ChangePhoneNumberModal: React.FC<ChangePhoneNumberModalProps> = ({
               type="tel"
               value={phoneNumber}
               onChange={(e) => {
-                setPhoneNumber(e.target.value);
+                const formatted = formatPhoneNumber(e.target.value);
+                setPhoneNumber(formatted);
                 setError('');
               }}
-              placeholder="(123) 456-7890"
+              placeholder="(123) 456-7899"
+              maxLength={14}
               className="w-full h-[56px] px-4 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] text-white font-lato text-[16px] leading-[24px] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               disabled={isLoading}
             />

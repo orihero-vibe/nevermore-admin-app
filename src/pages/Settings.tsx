@@ -4,7 +4,7 @@ import EditIcon from '../assets/icons/edit';
 import { ChangeEmailModal } from '../components/ChangeEmailModal';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { ChangePhoneNumberModal } from '../components/ChangePhoneNumberModal';
-import { updateEmail, updatePassword, updatePhone } from '../lib/auth';
+import { updateEmail, updatePassword, updatePhone, getCurrentUserProfile } from '../lib/auth';
 import { showSuccess } from '../lib/notifications';
 import type { Models } from 'appwrite';
 import { useStore } from '../store';
@@ -36,6 +36,7 @@ export const Settings = () => {
   const navigate = useNavigate();
   const { appwriteUser: storeAppwriteUser, checkAuth } = useStore();
   const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
+  const [userProfile, setUserProfile] = useState<{ phone?: string; [key: string]: unknown } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -46,10 +47,16 @@ export const Settings = () => {
 
   // Use store's appwriteUser data (already fetched by App.tsx)
   useEffect(() => {
-    if (storeAppwriteUser) {
-      setUser(storeAppwriteUser);
-    }
-    setIsLoading(false);
+    const loadUserData = async () => {
+      if (storeAppwriteUser) {
+        setUser(storeAppwriteUser);
+        // Fetch user profile to get phone number from user_profiles table
+        const profile = await getCurrentUserProfile();
+        setUserProfile(profile);
+      }
+      setIsLoading(false);
+    };
+    loadUserData();
   }, [storeAppwriteUser]);
 
   const handleEmailEdit = () => {
@@ -100,6 +107,9 @@ export const Settings = () => {
     try {
       const updatedUser = await updatePhone(newPhoneNumber, password);
       setUser(updatedUser);
+      // Refresh user profile to get updated phone number
+      const profile = await getCurrentUserProfile();
+      setUserProfile(profile);
       // Refresh auth state in store
       await checkAuth();
       showSuccess('Phone number updated successfully');
@@ -126,7 +136,8 @@ export const Settings = () => {
 
   const displayName = user?.name || user?.email || 'User';
   const displayEmail = user?.email || '';
-  const displayPhone = formatPhoneNumber(user?.phone);
+  // Get phone number from user_profiles table, not from auth user
+  const displayPhone = formatPhoneNumber(userProfile?.phone as string | undefined);
   const accountCreatedDate = formatDate(user?.$createdAt);
   const initials = displayName
     .split(' ')
