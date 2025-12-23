@@ -354,7 +354,7 @@ export const Journey40Day = () => {
                     style={{ 
                       fontFamily: 'Cinzel, serif', 
                       fontWeight: 400,
-                      fontSize: '40px',
+                      fontSize: isEditMode ? '40px' : '20px',
                       lineHeight: 'normal'
                     }}
                   />

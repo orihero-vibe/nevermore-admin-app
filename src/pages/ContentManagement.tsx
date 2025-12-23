@@ -16,7 +16,6 @@ interface ContentItem extends Record<string, unknown> {
   id: string;
   title: string;
   category: string; // Display name or empty string
-  role: string; // Capitalized: Support, Recovery, Prevention
   type: string; // Display: '40 Temptations' or '40 Day Journey'
   // Journey-specific fields
   tasks?: string[];
@@ -38,11 +37,6 @@ function mapContentToItem(
     categoryName = category ? getCategoryName(category) : '';
   }
 
-  // Capitalize role (support -> Support, recovery -> Recovery)
-  const roleDisplay = doc.role
-    ? doc.role.charAt(0).toUpperCase() + doc.role.slice(1)
-    : '';
-
   // Map database type to display type
   const typeDisplay =
     doc.type === 'forty_day_journey'
@@ -55,7 +49,6 @@ function mapContentToItem(
     id: doc.$id,
     title: doc.title,
     category: categoryName,
-    role: roleDisplay,
     type: typeDisplay,
     tasks: doc.tasks,
     hasAudio: doc.files && doc.files.length > 0,
@@ -63,13 +56,6 @@ function mapContentToItem(
   };
 }
 
-
-const roleOptions: SelectOption[] = [
-  { value: '', label: 'Roles' },
-  { value: 'support', label: 'Support' },
-  { value: 'recovery', label: 'Recovery' },
-  { value: 'prevention', label: 'Prevention' },
-];
 
 const typeOptions: SelectOption[] = [
   { value: '', label: 'Types' },
@@ -83,7 +69,6 @@ export const ContentManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedRole, setSelectedRole] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
@@ -111,6 +96,12 @@ export const ContentManagement = () => {
   // Fetch content when filters, search, or pagination changes
   useEffect(() => {
     const loadContent = async () => {
+      // Wait for categories to be loaded before fetching content
+      // This ensures category names can be resolved properly
+      if (categories.length === 0) {
+        return;
+      }
+      
       setIsLoading(true);
       setError(null);
 
@@ -121,7 +112,6 @@ export const ContentManagement = () => {
         // Map filter values to database values
         const filters: {
           category?: string;
-          role?: string;
           type?: string;
         } = {};
 
@@ -129,16 +119,6 @@ export const ContentManagement = () => {
         if (selectedCategory) {
           // selectedCategory is already the category ID from the dropdown
           filters.category = selectedCategory;
-        }
-
-        // Role filter - convert display to database value
-        if (selectedRole) {
-          const roleOption = roleOptions.find(
-            (opt) => opt.value === selectedRole
-          );
-          if (roleOption && roleOption.label !== 'All Roles') {
-            filters.role = roleOption.value; // Already lowercase
-          }
         }
 
         // Type filter
@@ -173,16 +153,13 @@ export const ContentManagement = () => {
     };
 
     loadContent();
-    // Note: categories is intentionally NOT in the dependency array
-    // We use it for mapping, but don't need to refetch content when categories change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentPage,
     itemsPerPage,
     debouncedSearchQuery,
     selectedCategory,
-    selectedRole,
     selectedType,
+    categories, // Added: re-map content when categories are loaded
   ]);
 
   // Handle ESC key to close modal
@@ -217,7 +194,6 @@ export const ContentManagement = () => {
   const columns: Column<ContentItem>[] = [
     { key: 'title', label: 'Title' },
     { key: 'category', label: 'Category' },
-    { key: 'role', label: 'Role' },
     { key: 'type', label: 'Type' },
   ];
 
@@ -278,18 +254,6 @@ export const ContentManagement = () => {
               setCurrentPage(1);
             }}
             placeholder="Category"
-          />
-        </div>
-
-        <div className="w-[160px]">
-          <Select
-            options={roleOptions}
-            value={selectedRole}
-            onChange={(value) => {
-              setSelectedRole(value);
-              setCurrentPage(1);
-            }}
-            placeholder="Role"
           />
         </div>
 

@@ -96,7 +96,10 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
       fileType.startsWith('image/') ||
       fileName.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg|ico)$/i)
     ) {
-      return 'image';
+      // Check if 'image' content type exists in options
+      if (contentTypes.some(ct => ct.value === 'image')) {
+        return 'image';
+      }
     }
 
     // Check for audio files
@@ -104,7 +107,14 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
       fileType.startsWith('audio/') ||
       fileName.match(/\.(mp3|wav|m4a|aac|ogg|flac|wma|opus)$/i)
     ) {
-      return 'audio';
+      // For new content types, default to 'question' for audio
+      if (contentTypes.some(ct => ct.value === 'question')) {
+        return 'question';
+      }
+      // Legacy fallback
+      if (contentTypes.some(ct => ct.value === 'audio')) {
+        return 'audio';
+      }
     }
 
     // Check for document/transcript files
@@ -117,75 +127,105 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
       fileType.includes('powerpoint') ||
       fileName.match(/\.(pdf|doc|docx|txt|psd|ai|ppt|pptx|rtf|odt)$/i)
     ) {
-      return 'transcript';
+      // For new content types, default to 'supportTranscript' for documents
+      if (contentTypes.some(ct => ct.value === 'supportTranscript')) {
+        return 'supportTranscript';
+      }
+      // Legacy fallback
+      if (contentTypes.some(ct => ct.value === 'transcript')) {
+        return 'transcript';
+      }
     }
 
     // Default to first content type if available, otherwise empty
     return contentTypes.length > 0 ? contentTypes[0].value : '';
   };
 
-  const addFiles = (files: File[]) => {
-    // Check if there's already a transcript file
-    const hasExistingTranscript = uploadFiles.some(
-      (uf) => uf.contentType === 'transcript'
-    );
+  // Single-file content types (only one file allowed per type)
+  const singleFileTypes = [
+    'mainContentSupport',
+    'mainContentRecovery',
+    'transcript', // Legacy
+  ];
 
-    // Separate files into transcript and non-transcript
-    const transcriptFiles: File[] = [];
-    const otherFiles: File[] = [];
+  // Transcript types that share a limit of 2 total
+  const transcriptTypes = ['supportTranscript', 'recoveryTranscript'];
+
+  const addFiles = (files: File[]) => {
+    // Create UploadFile objects with auto-detected content types
+    const newFiles: UploadFile[] = [];
     let discardedCount = 0;
+
+    // Count existing transcript files
+    const existingTranscriptCount = uploadFiles.filter(
+      (uf) => transcriptTypes.includes(uf.contentType)
+    ).length;
+
+    let newTranscriptCount = 0;
 
     files.forEach((file) => {
       const detectedType = detectContentType(file);
-      if (detectedType === 'transcript') {
-        transcriptFiles.push(file);
-      } else {
-        otherFiles.push(file);
+      
+      // Check if this is a single-file type and if one already exists
+      if (singleFileTypes.includes(detectedType)) {
+        const hasExisting = uploadFiles.some(
+          (uf) => uf.contentType === detectedType
+        );
+        const hasInNew = newFiles.some(
+          (uf) => uf.contentType === detectedType
+        );
+        
+        if (hasExisting || hasInNew) {
+          discardedCount++;
+          return; // Skip this file
+        }
       }
-    });
 
-    // Handle transcript files - only allow one
-    let transcriptToAdd: File | null = null;
-    if (transcriptFiles.length > 0) {
-      if (hasExistingTranscript) {
-        // Already have a transcript, discard all new transcript files
-        discardedCount = transcriptFiles.length;
-      } else {
-        // Take only the first transcript file
-        transcriptToAdd = transcriptFiles[0];
-        discardedCount = transcriptFiles.length - 1;
+      // Handle transcript files - allow max 2 total (one of each type)
+      if (transcriptTypes.includes(detectedType)) {
+        const totalTranscripts = existingTranscriptCount + newTranscriptCount;
+        if (totalTranscripts >= 2) {
+          discardedCount++;
+          return; // Skip this file
+        }
+        
+        // Assign alternating type if we already have one
+        let assignedType = detectedType;
+        const existingSupportTranscript = uploadFiles.some(uf => uf.contentType === 'supportTranscript') ||
+          newFiles.some(uf => uf.contentType === 'supportTranscript');
+        const existingRecoveryTranscript = uploadFiles.some(uf => uf.contentType === 'recoveryTranscript') ||
+          newFiles.some(uf => uf.contentType === 'recoveryTranscript');
+        
+        if (existingSupportTranscript && !existingRecoveryTranscript) {
+          assignedType = 'recoveryTranscript';
+        } else if (!existingSupportTranscript && existingRecoveryTranscript) {
+          assignedType = 'supportTranscript';
+        }
+        
+        newFiles.push({
+          id: `${Date.now()}-${Math.random()}`,
+          file,
+          progress: 0,
+          contentType: assignedType,
+        });
+        newTranscriptCount++;
+        return;
       }
-    }
-
-    // Show warning if files were discarded
-    if (discardedCount > 0) {
-      showWarning(
-        `${discardedCount} transcript file(s) discarded. Only one transcript file is allowed.`
-      );
-    }
-
-    // Create UploadFile objects with auto-detected content types
-    const newFiles: UploadFile[] = [];
-
-    // Add the single transcript file if allowed
-    if (transcriptToAdd) {
-      newFiles.push({
-        id: `${Date.now()}-${Math.random()}`,
-        file: transcriptToAdd,
-        progress: 0,
-        contentType: 'transcript',
-      });
-    }
-
-    // Add other files with their detected content types
-    otherFiles.forEach((file) => {
+      
       newFiles.push({
         id: `${Date.now()}-${Math.random()}`,
         file,
         progress: 0,
-        contentType: detectContentType(file),
+        contentType: detectedType,
       });
     });
+
+    // Show warning if files were discarded
+    if (discardedCount > 0) {
+      showWarning(
+        `${discardedCount} file(s) discarded. Only one file per type is allowed for main content, and max 2 transcripts.`
+      );
+    }
 
     setUploadFiles((prev) => {
       const updated = [...prev, ...newFiles];
@@ -222,6 +262,28 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
   };
 
   const updateContentType = (fileId: string, contentType: string) => {
+    // Check if this type is single-file and already exists
+    if (singleFileTypes.includes(contentType)) {
+      const hasExisting = uploadFiles.some(
+        (uf) => uf.id !== fileId && uf.contentType === contentType
+      );
+      if (hasExisting) {
+        showWarning(`Only one ${contentType} file is allowed.`);
+        return;
+      }
+    }
+
+    // Check transcript types - prevent duplicate types
+    if (transcriptTypes.includes(contentType)) {
+      const hasExisting = uploadFiles.some(
+        (uf) => uf.id !== fileId && uf.contentType === contentType
+      );
+      if (hasExisting) {
+        showWarning(`Only one file per transcript type is allowed.`);
+        return;
+      }
+    }
+
     setUploadFiles((prev) =>
       prev.map((f) => (f.id === fileId ? { ...f, contentType } : f))
     );
@@ -291,7 +353,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
 
         {/* Uploading Files List - Scrollable */}
         {uploadFiles.length > 0 && (
-          <div className="flex flex-col gap-4 overflow-y-auto overflow-x-hidden max-h-[400px] pr-2 custom-scrollbar min-h-0">
+          <div className="flex flex-col gap-4 overflow-y-auto overflow-x-hidden max-h-[400px] pr-2 custom-scrollbar min-h-0 py-2">
             {uploadFiles.map((uploadFile) => (
               <div key={uploadFile.id} className="flex gap-6 items-start shrink-0 min-w-0">
                 {/* File Info with Progress - Fixed width */}
@@ -335,7 +397,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
                 </div>
 
                 {/* Content Type Select - Fixed width */}
-                <div className="w-[184px] flex flex-col gap-2 shrink-0">
+                <div className="w-[220px] flex flex-col gap-2 shrink-0">
                   <label
                     className="text-white text-[14px] leading-[20px]"
                     style={{ fontFamily: 'Roboto, sans-serif' }}

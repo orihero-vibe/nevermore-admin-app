@@ -9,17 +9,20 @@ import type { SelectOption } from '../components/Select';
 import { Button } from '../components/Button';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { FileUploadPopup, type UploadFile } from '../components/FileUploadPopup';
-import { TranscriptUploadModal, type TranscriptFile } from '../components/TranscriptUploadModal';
 import { categoriesToSelectOptions, categoriesToCategoryCards, getCategoryName } from '../lib/categories';
-import { publishContent } from '../lib/content';
+import { publishContent, type TemptationFiles } from '../lib/content';
 import { showAppwriteError } from '../lib/notifications';
 import DeleteIcon from '@/assets/icons/delete';
 import { useCategoriesStore } from '../store/categoriesStore';
 
-const roleOptions: SelectOption[] = [
-  { value: '', label: 'Select Role' },
-  { value: 'support', label: 'Support' },
-  { value: 'recovery', label: 'Recovery' },
+// Content type options for file upload
+const contentTypeOptions: SelectOption[] = [
+  { value: 'supportTranscript', label: 'Support Transcript' },
+  { value: 'recoveryTranscript', label: 'Recovery Transcript' },
+  { value: 'image', label: 'Image' },
+  { value: 'mainContentSupport', label: 'Main Content (Support)' },
+  { value: 'mainContentRecovery', label: 'Main Content (Recovery)' },
+  { value: 'question', label: 'Question' },
 ];
 
 export const CreateTemptation = () => {
@@ -28,16 +31,18 @@ export const CreateTemptation = () => {
 
   const [contentTitle, setContentTitle] = useState('');
   const [categoryType, setCategoryType] = useState('');
-  const [role, setRole] = useState('');
-  const [uploadedImages, setUploadedImages] = useState<Array<{ id: string; src: string; file: File }>>([]);
-  const [uploadedAudioFiles, setUploadedAudioFiles] = useState<File[]>([]);
-  const [uploadedTranscripts, setUploadedTranscripts] = useState<TranscriptFile[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [isTranscriptModalOpen, setIsTranscriptModalOpen] = useState(false);
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
-  const [uploadType, setUploadType] = useState<'audio' | 'image' | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
+  
+  // New file state based on content types
+  const [uploadedImages, setUploadedImages] = useState<Array<{ id: string; src: string; file: File }>>([]);
+  const [questionAudioFiles, setQuestionAudioFiles] = useState<File[]>([]);
+  const [mainContentSupportFile, setMainContentSupportFile] = useState<File | null>(null);
+  const [mainContentRecoveryFile, setMainContentRecoveryFile] = useState<File | null>(null);
+  const [transcriptSupportFile, setTranscriptSupportFile] = useState<File | null>(null);
+  const [transcriptRecoveryFile, setTranscriptRecoveryFile] = useState<File | null>(null);
 
   // Fetch categories on mount (only once, centrally managed)
   useEffect(() => {
@@ -97,86 +102,63 @@ export const CreateTemptation = () => {
     }
   };
 
-  const handleUploadButtonClick = (type: 'audio' | 'image' | 'transcript') => {
-    if (type === 'transcript') {
-      setIsTranscriptModalOpen(true);
-    } else {
-      setUploadType(type);
-      setIsUploadPopupOpen(true);
-    }
-  };
-
-  const handleTranscriptUploadComplete = (transcriptFiles: TranscriptFile[]) => {
-    setUploadedTranscripts(transcriptFiles);
-    setIsTranscriptModalOpen(false);
+  const handleUploadButtonClick = () => {
+    setIsUploadPopupOpen(true);
   };
 
   const handleUploadComplete = (uploadFiles: UploadFile[]) => {
-    const imageFiles: File[] = [];
-    const audioFiles: File[] = [];
-    const transcriptFiles: File[] = [];
-
     uploadFiles.forEach((uploadFile) => {
       switch (uploadFile.contentType) {
-        case 'image':
-          imageFiles.push(uploadFile.file);
+        case 'image': {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setUploadedImages((prev) => [
+              ...prev,
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                src: reader.result as string,
+                file: uploadFile.file,
+              },
+            ]);
+          };
+          reader.readAsDataURL(uploadFile.file);
           break;
-        case 'audio':
-          audioFiles.push(uploadFile.file);
+        }
+        case 'question':
+          setQuestionAudioFiles((prev) => [...prev, uploadFile.file]);
           break;
-        case 'transcript':
-          transcriptFiles.push(uploadFile.file);
+        case 'mainContentSupport': {
+          setMainContentSupportFile(uploadFile.file);
+          // Auto-fill content title from main content support file name
+          if (!contentTitle.trim()) {
+            const fileName = uploadFile.file.name;
+            const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
+            setContentTitle(nameWithoutExt);
+          }
+          break;
+        }
+        case 'mainContentRecovery':
+          setMainContentRecoveryFile(uploadFile.file);
+          break;
+        case 'supportTranscript':
+          setTranscriptSupportFile(uploadFile.file);
+          break;
+        case 'recoveryTranscript':
+          setTranscriptRecoveryFile(uploadFile.file);
           break;
       }
     });
 
-    if (imageFiles.length > 0) {
-      imageFiles.forEach((imageFile) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setUploadedImages((prev) => [
-            ...prev,
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              src: reader.result as string,
-              file: imageFile,
-            },
-          ]);
-        };
-        reader.readAsDataURL(imageFile);
-      });
-    }
-
-    if (audioFiles.length > 0) {
-      setUploadedAudioFiles((prev) => [...prev, ...audioFiles]);
-      if (!contentTitle.trim() && audioFiles[0]) {
-        const fileName = audioFiles[0].name;
-        const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
-        setContentTitle(nameWithoutExt);
-      }
-    }
-
-    // Transcript files are now handled separately via TranscriptUploadModal
-    // This code path is kept for backward compatibility but shouldn't be reached
-
     setIsUploadPopupOpen(false);
-    setUploadType(null);
   };
 
-  const getUploadPopupConfig = () => {
-    return {
-      accept: '*',
-      title: 'Upload',
-      supportedFormats: 'JPEG, PNG, GIF, MP4, PDF, PSD, AI, Word, PPT',
-      maxFiles: undefined,
-    };
-  };
 
   const handleRemoveImage = (imageId: string) => {
     setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
   };
 
   const handlePublish = async () => {
+    // Validation
     if (!contentTitle.trim()) {
       showAppwriteError(new Error('Content title is required'));
       return;
@@ -187,13 +169,33 @@ export const CreateTemptation = () => {
       return;
     }
 
-    if (!role) {
-      showAppwriteError(new Error('Role is required'));
+    if (uploadedImages.length === 0) {
+      showAppwriteError(new Error('Please upload at least one image'));
       return;
     }
 
-    if (uploadedAudioFiles.length === 0) {
-      showAppwriteError(new Error('Please upload at least one audio file'));
+    if (!mainContentSupportFile) {
+      showAppwriteError(new Error('Main Content (Support) is required'));
+      return;
+    }
+
+    if (!mainContentRecoveryFile) {
+      showAppwriteError(new Error('Main Content (Recovery) is required'));
+      return;
+    }
+
+    if (!transcriptSupportFile) {
+      showAppwriteError(new Error('Support Transcript is required'));
+      return;
+    }
+
+    if (!transcriptRecoveryFile) {
+      showAppwriteError(new Error('Recovery Transcript is required'));
+      return;
+    }
+
+    if (questionAudioFiles.length === 0) {
+      showAppwriteError(new Error('Please upload at least one Question audio file'));
       return;
     }
 
@@ -202,23 +204,31 @@ export const CreateTemptation = () => {
 
     try {
       const imageFiles = uploadedImages.map((img) => img.file);
-      const transcriptFiles = uploadedTranscripts.map((t) => t.file);
+      
+      const temptationFiles: TemptationFiles = {
+        imageFiles,
+        questionFiles: questionAudioFiles,
+        mainContentSupportFile,
+        mainContentRecoveryFile,
+        transcriptSupportFile,
+        transcriptRecoveryFile,
+      };
       
       await publishContent(
         {
           title: contentTitle.trim(),
           category: categoryType,
-          role: role,
           type: 'forty_temptations',
         },
-        imageFiles,
-        uploadedAudioFiles,
-        null, // Single transcript file (deprecated)
-        transcriptFiles.length > 0 ? transcriptFiles : undefined, // Multiple transcript files
-        undefined,
+        [], // Legacy imageFiles
+        [], // Legacy audioFiles
+        null, // Legacy single transcript
+        undefined, // Legacy multiple transcripts
+        undefined, // tasks
         (progress) => {
           setPublishProgress(progress);
-        }
+        },
+        temptationFiles
       );
 
       navigate('/content-management');
@@ -279,44 +289,31 @@ export const CreateTemptation = () => {
                 </div>
                 <Button
                   className="w-[200px] h-[56px] shrink-0"
-                  onClick={() => handleUploadButtonClick('audio')}
+                  onClick={handleUploadButtonClick}
                 >
-                  Upload Audio Files
+                  Upload Files
                 </Button>
               </div>
 
-              {/* Category Type and Role - Side by Side */}
-              <div className="flex gap-4">
-                <div className="flex-1 flex flex-col gap-2">
-                  <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                    Category Type
-                    {isLoadingCategories && (
-                      <span className="text-[#8f8f8f] text-[12px] ml-2">(Loading...)</span>
-                    )}
-                    {categoriesError && (
-                      <span className="text-red-400 text-[12px] ml-2" title={categoriesError}>
-                        (Error - check console)
-                      </span>
-                    )}
-                  </label>
-                  <Select
-                    options={categoryOptions}
-                    value={categoryType}
-                    onChange={setCategoryType}
-                    placeholder={isLoadingCategories ? 'Loading categories...' : 'Select Category'}
-                  />
-                </div>
-                <div className="flex-1 flex flex-col gap-2">
-                  <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                    Role
-                  </label>
-                  <Select
-                    options={roleOptions}
-                    value={role}
-                    onChange={setRole}
-                    placeholder="Select Role"
-                  />
-                </div>
+              {/* Category Type */}
+              <div className="flex flex-col gap-2">
+                <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                  Category Type
+                  {isLoadingCategories && (
+                    <span className="text-[#8f8f8f] text-[12px] ml-2">(Loading...)</span>
+                  )}
+                  {categoriesError && (
+                    <span className="text-red-400 text-[12px] ml-2" title={categoriesError}>
+                      (Error - check console)
+                    </span>
+                  )}
+                </label>
+                <Select
+                  options={categoryOptions}
+                  value={categoryType}
+                  onChange={setCategoryType}
+                  placeholder={isLoadingCategories ? 'Loading categories...' : 'Select Category'}
+                />
               </div>
 
               {/* Pre-defined Categories */}
@@ -363,26 +360,45 @@ export const CreateTemptation = () => {
                 )}
               </div>
 
-              {/* Audio Players */}
-              {uploadedAudioFiles.length > 0 && (
+              {/* Main Content Audio Players */}
+              {(mainContentSupportFile || mainContentRecoveryFile) && (
                 <div className="flex flex-col gap-4">
-                  {uploadedAudioFiles.map((file, index) => {
-                    const audioIndex = index;
-                    return (
-                      <AudioPlayer
-                        key={`new-${file.name}-${index}`}
-                        label={audioIndex === 0 ? 'Main Content' : `Question ${audioIndex}`}
-                        file={file}
-                        onRemove={() => {
-                          setUploadedAudioFiles((prev) => {
-                            const newFiles = [...prev];
-                            newFiles.splice(index, 1);
-                            return newFiles;
-                          });
-                        }}
-                      />
-                    );
-                  })}
+                  {mainContentSupportFile && (
+                    <AudioPlayer
+                      key="main-content-support"
+                      label="Main Content (Support)"
+                      file={mainContentSupportFile}
+                      onRemove={() => setMainContentSupportFile(null)}
+                    />
+                  )}
+                  {mainContentRecoveryFile && (
+                    <AudioPlayer
+                      key="main-content-recovery"
+                      label="Main Content (Recovery)"
+                      file={mainContentRecoveryFile}
+                      onRemove={() => setMainContentRecoveryFile(null)}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Question Audio Players */}
+              {questionAudioFiles.length > 0 && (
+                <div className="flex flex-col gap-4">
+                  {questionAudioFiles.map((file, index) => (
+                    <AudioPlayer
+                      key={`question-${file.name}-${index}`}
+                      label={`Question ${index + 1}`}
+                      file={file}
+                      onRemove={() => {
+                        setQuestionAudioFiles((prev) => {
+                          const newFiles = [...prev];
+                          newFiles.splice(index, 1);
+                          return newFiles;
+                        });
+                      }}
+                    />
+                  ))}
                 </div>
               )}
             </div>
@@ -434,9 +450,9 @@ export const CreateTemptation = () => {
                   </div>
                   <Button
                     className="w-full h-[56px]"
-                    onClick={() => handleUploadButtonClick('image')}
+                    onClick={handleUploadButtonClick}
                   >
-                    Upload Image(s)
+                    Upload More
                   </Button>
                 </div>
               ) : (
@@ -445,7 +461,7 @@ export const CreateTemptation = () => {
                     className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#965cdf] transition-colors"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, 'image')}
-                    onClick={() => handleUploadButtonClick('image')}
+                    onClick={handleUploadButtonClick}
                   >
                     <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
                       No image uploaded
@@ -453,9 +469,9 @@ export const CreateTemptation = () => {
                   </div>
                   <Button
                     className="w-full h-[56px]"
-                    onClick={() => handleUploadButtonClick('image')}
+                    onClick={handleUploadButtonClick}
                   >
-                    Upload Image(s)
+                    Upload Files
                   </Button>
                 </>
               )}
@@ -468,56 +484,73 @@ export const CreateTemptation = () => {
                 >
                   Transcripts:
                 </label>
-                {uploadedTranscripts.length > 0 ? (
+                {(transcriptSupportFile || transcriptRecoveryFile) ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                      {uploadedTranscripts.map((transcript) => (
-                        <div
-                          key={transcript.id}
-                          className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-4 flex flex-col gap-3 items-start"
-                        >
+                      {transcriptSupportFile && (
+                        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-4 flex flex-col gap-3 items-start">
                           <div className="flex items-center justify-between w-full">
-                            <p
-                              className="text-white text-[16px] leading-[24px] truncate flex-1"
-                              style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
-                              title={transcript.file.name}
-                            >
-                              {transcript.file.name}
-                            </p>
+                            <div className="flex flex-col gap-1 flex-1 min-w-0">
+                              <span className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                                Support Transcript
+                              </span>
+                              <p
+                                className="text-white text-[16px] leading-[24px] truncate"
+                                style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
+                                title={transcriptSupportFile.name}
+                              >
+                                {transcriptSupportFile.name}
+                              </p>
+                            </div>
                             <button
-                              onClick={() => {
-                                setUploadedTranscripts((prev) =>
-                                  prev.filter((t) => t.id !== transcript.id)
-                                );
-                              }}
+                              onClick={() => setTranscriptSupportFile(null)}
                               className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
                               aria-label="Remove transcript"
                             >
                               <CloseIcon width={24} height={24} color="#8f8f8f" />
                             </button>
                           </div>
-                          {transcript.progress < 100 && (
-                            <div className="bg-[rgba(255,255,255,0.07)] w-full h-[4px] rounded-full overflow-hidden">
-                              <div
-                                className="bg-[#965cdf] h-full transition-all duration-300"
-                                style={{ width: `${Math.min(transcript.progress, 100)}%` }}
-                              />
-                            </div>
-                          )}
                         </div>
-                      ))}
+                      )}
+                      {transcriptRecoveryFile && (
+                        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-4 flex flex-col gap-3 items-start">
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex flex-col gap-1 flex-1 min-w-0">
+                              <span className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                                Recovery Transcript
+                              </span>
+                              <p
+                                className="text-white text-[16px] leading-[24px] truncate"
+                                style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
+                                title={transcriptRecoveryFile.name}
+                              >
+                                {transcriptRecoveryFile.name}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setTranscriptRecoveryFile(null)}
+                              className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                              aria-label="Remove transcript"
+                            >
+                              <CloseIcon width={24} height={24} color="#8f8f8f" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      className="w-full h-[56px]"
-                      onClick={() => handleUploadButtonClick('transcript')}
-                    >
-                      Upload More Transcripts
-                    </Button>
+                    {(!transcriptSupportFile || !transcriptRecoveryFile) && (
+                      <Button
+                        className="w-full h-[56px]"
+                        onClick={handleUploadButtonClick}
+                      >
+                        Upload {!transcriptSupportFile ? 'Support' : 'Recovery'} Transcript
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div
                     className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
-                    onClick={() => handleUploadButtonClick('transcript')}
+                    onClick={handleUploadButtonClick}
                   >
                     <CloudUploadIcon width={48} height={48} color="#fff" />
                     <div className="text-center">
@@ -532,7 +565,7 @@ export const CreateTemptation = () => {
                         className="text-[#8f8f8f] text-[12px] leading-[16px]"
                         style={{ fontFamily: 'Roboto, sans-serif' }}
                       >
-                        Supported formats: PDF, DOC, DOCX, TXT, RTF, ODT
+                        Support Transcript & Recovery Transcript
                       </p>
                     </div>
                   </div>
@@ -570,33 +603,14 @@ export const CreateTemptation = () => {
       </div>
 
       {/* File Upload Popup */}
-      {uploadType && (
-        <FileUploadPopup
-          isOpen={isUploadPopupOpen}
-          onClose={() => {
-            setIsUploadPopupOpen(false);
-            setUploadType(null);
-          }}
-          onUpload={handleUploadComplete}
-          accept={getUploadPopupConfig().accept}
-          maxFiles={getUploadPopupConfig().maxFiles}
-          title={getUploadPopupConfig().title}
-          supportedFormats={getUploadPopupConfig().supportedFormats}
-          contentTypes={[
-            { value: 'image', label: 'Image' },
-            { value: 'transcript', label: 'Transcript' },
-            { value: 'audio', label: 'Audio' },
-          ]}
-        />
-      )}
-
-      {/* Transcript Upload Modal */}
-      <TranscriptUploadModal
-        isOpen={isTranscriptModalOpen}
-        onClose={() => setIsTranscriptModalOpen(false)}
-        onUpload={handleTranscriptUploadComplete}
-        accept=".pdf,.doc,.docx,.txt,.rtf,.odt"
-        supportedFormats="PDF, DOC, DOCX, TXT, RTF, ODT"
+      <FileUploadPopup
+        isOpen={isUploadPopupOpen}
+        onClose={() => setIsUploadPopupOpen(false)}
+        onUpload={handleUploadComplete}
+        accept="*"
+        title="Upload Files"
+        supportedFormats="Images, Audio (MP3, WAV, M4A), Documents (PDF, DOC, DOCX)"
+        contentTypes={contentTypeOptions}
       />
     </div>
   );

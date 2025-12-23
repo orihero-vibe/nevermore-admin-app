@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ChevronDownIcon from '../assets/icons/chevron-down';
 
 export interface SelectOption {
@@ -22,11 +23,19 @@ export const Select: React.FC<SelectProps> = ({
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const selectRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      // Check if click is outside both the select trigger and the dropdown portal
+      const isOutsideSelect = selectRef.current && !selectRef.current.contains(target);
+      const isOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(target);
+      
+      if (isOutsideSelect && isOutsideDropdown) {
         setIsOpen(false);
       }
     };
@@ -36,6 +45,18 @@ export const Select: React.FC<SelectProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, [isOpen]);
 
   const selectedOption = value && value !== '' ? options.find((opt) => opt.value === value) : null;
 
@@ -47,6 +68,7 @@ export const Select: React.FC<SelectProps> = ({
   return (
     <div className={`relative ${className}`} ref={selectRef}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="w-full h-[56px] px-4 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] flex items-center justify-between gap-3 hover:bg-gray-800 transition focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -62,21 +84,26 @@ export const Select: React.FC<SelectProps> = ({
         />
       </button>
 
-      {isOpen && (
-        <div className="absolute z-10 w-full mt-1 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] shadow-lg max-h-60 overflow-auto">
+      {isOpen && createPortal(
+        <div 
+          ref={dropdownRef}
+          style={dropdownStyle}
+          className="z-[9999] bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] shadow-lg overflow-hidden"
+        >
           {options.map((option) => (
             <button
               key={option.value}
               type="button"
               onClick={() => handleSelect(option.value)}
-              className={`w-full px-4 py-2 text-left text-white hover:bg-gray-800 transition font-lato text-[16px] truncate ${
+              className={`w-full px-4 py-3 text-left text-white hover:bg-gray-800 transition font-lato text-[16px] ${
                 value === option.value ? 'bg-gray-800' : ''
               }`}
             >
               {option.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
