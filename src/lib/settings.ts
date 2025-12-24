@@ -13,6 +13,12 @@ export interface SettingDocument {
   $updatedAt?: string;
 }
 
+export interface AppLinkSettings {
+  deepLinkUrl: string | null;
+  playStoreUrl: string | null;
+  appStoreUrl: string | null;
+}
+
 /**
  * Get a setting by key (terms or privacy)
  */
@@ -52,6 +58,51 @@ export async function getSetting(key: 'terms' | 'privacy'): Promise<SettingDocum
     console.error('Error fetching setting:', error);
     showAppwriteError(error);
     throw error;
+  }
+}
+
+/**
+ * Create or update a setting
+ */
+/**
+ * Get app link settings (deepLinkUrl, playStoreUrl, appStoreUrl)
+ */
+export async function getAppLinkSettings(): Promise<AppLinkSettings> {
+  if (!DATABASE_ID || !SETTINGS_COLLECTION_ID) {
+    console.error('Database configuration missing');
+    return { deepLinkUrl: null, playStoreUrl: null, appStoreUrl: null };
+  }
+
+  try {
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: SETTINGS_COLLECTION_ID,
+      queries: [
+        Query.equal('key', ['deepLinkUrl', 'playStoreUrl', 'appStoreUrl'])
+      ]
+    });
+
+    const settings: AppLinkSettings = {
+      deepLinkUrl: null,
+      playStoreUrl: null,
+      appStoreUrl: null
+    };
+
+    response.rows.forEach((row: unknown) => {
+      const doc = row as SettingDocument;
+      if (doc.key === 'deepLinkUrl' && doc.value && doc.value !== '-') {
+        settings.deepLinkUrl = doc.value;
+      } else if (doc.key === 'playStoreUrl' && doc.value && doc.value !== '-') {
+        settings.playStoreUrl = doc.value;
+      } else if (doc.key === 'appStoreUrl' && doc.value && doc.value !== '-') {
+        settings.appStoreUrl = doc.value;
+      }
+    });
+
+    return settings;
+  } catch (error) {
+    console.error('Error fetching app link settings:', error);
+    return { deepLinkUrl: null, playStoreUrl: null, appStoreUrl: null };
   }
 }
 

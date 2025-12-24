@@ -15,6 +15,7 @@ import { TemptationDetails } from '../pages/TemptationDetails';
 import { CreateTemptation } from '../pages/CreateTemptation';
 import { Settings } from '../pages/Settings';
 import { TermsAndPrivacy } from '../pages/TermsAndPrivacy';
+import { DeepLinkRedirect } from '../pages/DeepLinkRedirect';
 
 export const router = createBrowserRouter([
   {
@@ -64,6 +65,14 @@ export const router = createBrowserRouter([
         <CreateNewPassword />
       </PublicRoute>
     ),
+  },
+  {
+    path: '/reset-password',
+    element: <DeepLinkRedirect />,
+  },
+  {
+    path: '/invitation',
+    element: <DeepLinkRedirect />,
   },
   {
     path: '/dashboard',
