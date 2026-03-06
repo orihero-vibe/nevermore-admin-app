@@ -14,6 +14,7 @@ import { Journey40Day } from '../pages/Journey40Day';
 import { TemptationDetails } from '../pages/TemptationDetails';
 import { CreateTemptation } from '../pages/CreateTemptation';
 import { Settings } from '../pages/Settings';
+import { FreeContent } from '../pages/FreeContent';
 import { TermsAndPrivacy } from '../pages/TermsAndPrivacy';
 import { DeepLinkRedirect } from '../pages/DeepLinkRedirect';
 
@@ -95,6 +96,10 @@ export const router = createBrowserRouter([
         element: <Settings />,
       },
       {
+        path: 'free-content',
+        element: <FreeContent />,
+      },
+      {
         path: 'terms-and-privacy',
         element: <TermsAndPrivacy />,
       },
@@ -157,6 +162,24 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <Settings />,
+      },
+      {
+        path: '*',
+        element: <NotFound />,
+      },
+    ],
+  },
+  {
+    path: '/free-content',
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <FreeContent />,
       },
       {
         path: '*',

@@ -9,6 +9,7 @@ interface CategoriesState {
   
   // Actions
   loadCategories: () => Promise<void>;
+  refreshCategories: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -45,6 +46,11 @@ export const useCategoriesStore = create<CategoriesState>((set, get) => ({
         isFetched: false // Allow retry on error
       });
     }
+  },
+
+  refreshCategories: async () => {
+    set({ isFetched: false });
+    await get().loadCategories();
   },
   
   clearError: () => set({ error: null }),

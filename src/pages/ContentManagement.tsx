@@ -21,6 +21,8 @@ interface ContentItem extends Record<string, unknown> {
   tasks?: string[];
   hasAudio?: boolean;
   day?: number;
+  /** True when this item is free (journey: isFree; temptation: category freeTemptationContentId) */
+  isFree?: boolean;
 }
 
 /**
@@ -45,6 +47,15 @@ function mapContentToItem(
       ? '40 Temptations'
       : doc.type;
 
+  // Free: journey uses doc.isFree; temptation is free if any category has this content as freeTemptationContentId
+  const isFree =
+    doc.type === 'forty_day_journey'
+      ? !!doc.isFree
+      : doc.type === 'forty_temptations' &&
+        categories.some(
+          (c) => c.freeTemptationContentId != null && String(c.freeTemptationContentId) === doc.$id
+        );
+
   return {
     id: doc.$id,
     title: doc.title,
@@ -53,6 +64,7 @@ function mapContentToItem(
     tasks: doc.tasks,
     hasAudio: doc.files && doc.files.length > 0,
     day: doc.day,
+    isFree,
   };
 }
 
@@ -195,6 +207,18 @@ export const ContentManagement = () => {
     { key: 'title', label: 'Title' },
     { key: 'category', label: 'Category' },
     { key: 'type', label: 'Type' },
+    {
+      key: 'isFree',
+      label: 'Free',
+      render: (_value: unknown, row: ContentItem) =>
+        row.isFree ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[12px] font-medium bg-[rgba(150,92,223,0.25)] text-[#c9a8f0]">
+            Free
+          </span>
+        ) : (
+          ''
+        ),
+    },
   ];
 
   const handlePageChange = (page: number) => {

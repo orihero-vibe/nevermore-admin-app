@@ -8,7 +8,10 @@ export interface Category {
   title?: string;
   label?: string;
   order?: number;
-  // Add other fields as needed based on your AppWrite schema
+  /** Content $id that is free in this category. At most 3 categories should have this set. */
+  freeTemptationContentId?: string | null;
+  /** Convenience flag for admin UI; can be derived from freeTemptationContentId != null */
+  isFreeCategory?: boolean;
   [key: string]: unknown;
 }
 
@@ -157,5 +160,80 @@ export function categoriesToSelectOptions(categories: Category[]): SelectOption[
  */
 export function categoriesToCategoryCards(categories: Category[]): string[] {
   return categories.map((category) => getCategoryName(category));
+}
+
+/**
+ * Count how many categories have a free temptation set
+ */
+export function countCategoriesWithFreeTemptation(categories: Category[]): number {
+  return categories.filter(
+    (c) => c.freeTemptationContentId != null && String(c.freeTemptationContentId).trim() !== ''
+  ).length;
+}
+
+const MAX_CATEGORIES_WITH_FREE_TEMPTATION = 3;
+
+/**
+ * Validates that setting freeTemptationContentId on a category would not exceed the limit of 3.
+ * Call before updateCategory when setting a non-null freeTemptationContentId.
+ * @throws Error if the limit would be exceeded
+ */
+export function validateFreeTemptationLimit(
+  categories: Category[],
+  categoryIdBeingUpdated: string,
+  newFreeContentId: string | null
+): void {
+  if (newFreeContentId == null || String(newFreeContentId).trim() === '') {
+    return; // Clearing is always allowed
+  }
+  const category = categories.find((c) => c.$id === categoryIdBeingUpdated);
+  const alreadyHadFree = category && category.freeTemptationContentId != null && String(category.freeTemptationContentId).trim() !== '';
+  const currentCount = countCategoriesWithFreeTemptation(categories);
+  const newCount = alreadyHadFree ? currentCount : currentCount + 1;
+  if (newCount > MAX_CATEGORIES_WITH_FREE_TEMPTATION) {
+    throw new Error(
+      `At most ${MAX_CATEGORIES_WITH_FREE_TEMPTATION} categories can have a free temptation. Clear one to assign another.`
+    );
+  }
+}
+
+export interface UpdateCategoryData {
+  freeTemptationContentId?: string | null;
+  isFreeCategory?: boolean;
+}
+
+/**
+ * Update a category's free-content fields in Appwrite
+ */
+export async function updateCategory(
+  categoryId: string,
+  data: UpdateCategoryData
+): Promise<void> {
+  if (!DATABASE_ID) {
+    throw new Error(
+      'VITE_APPWRITE_DATABASE_ID is not set in environment variables. Please add it to your .env file.'
+    );
+  }
+  if (!CATEGORY_COLLECTION_ID) {
+    throw new Error(
+      'VITE_APPWRITE_CATEGORY_COLLECTION_ID is not set in environment variables. Please add it to your .env file.'
+    );
+  }
+  const payload: Record<string, unknown> = {};
+  if (data.freeTemptationContentId !== undefined) {
+    payload.freeTemptationContentId = data.freeTemptationContentId;
+  }
+  if (data.isFreeCategory !== undefined) {
+    payload.isFreeCategory = data.isFreeCategory;
+  }
+  if (Object.keys(payload).length === 0) {
+    return;
+  }
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: CATEGORY_COLLECTION_ID,
+    rowId: categoryId,
+    data: payload,
+  });
 }
 

@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserProfile } from './UserProfile';
 import ContentManagementIcon from '../assets/icons/content-management';
+import CheckCircleIcon from '../assets/icons/check-circle';
 import SettingsIcon from '../assets/icons/settings';
 import SignOutIcon from '../assets/icons/sign-out';
 import { useStore } from '../store';
@@ -11,6 +12,11 @@ const navigationItems = [
     path: '/content-management',
     name: 'Content Management',
     icon: ContentManagementIcon,
+  },
+  {
+    path: '/free-content',
+    name: 'Free content',
+    icon: CheckCircleIcon,
   },
   {
     path: '/settings',
