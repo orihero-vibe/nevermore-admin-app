@@ -154,12 +154,14 @@ export function categoriesToSelectOptions(categories: Category[]): SelectOption[
 }
 
 /**
- * Converts categories to category cards array (just names)
+ * Converts categories to category cards data
  * @param categories Array of category documents
- * @returns string[] Array of category names
+ * @returns Array of objects with stable id + display name
  */
-export function categoriesToCategoryCards(categories: Category[]): string[] {
-  return categories.map((category) => getCategoryName(category));
+export function categoriesToCategoryCards(
+  categories: Category[]
+): Array<{ id: string; name: string }> {
+  return categories.map((category) => ({ id: category.$id, name: getCategoryName(category) }));
 }
 
 /**

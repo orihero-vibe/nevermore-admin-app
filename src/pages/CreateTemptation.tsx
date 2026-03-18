@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
-import ChevronDownIcon from '../assets/icons/chevron-down';
 import CloudUploadIcon from '../assets/icons/cloud-upload';
 import CloseIcon from '../assets/icons/close';
 import { Select } from '../components/Select';
@@ -9,7 +8,7 @@ import type { SelectOption } from '../components/Select';
 import { Button } from '../components/Button';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { FileUploadPopup, type UploadFile } from '../components/FileUploadPopup';
-import { categoriesToSelectOptions, categoriesToCategoryCards, getCategoryName } from '../lib/categories';
+import { categoriesToSelectOptions } from '../lib/categories';
 import { publishContent, type TemptationFiles } from '../lib/content';
 import { showAppwriteError } from '../lib/notifications';
 import DeleteIcon from '@/assets/icons/delete';
@@ -31,7 +30,6 @@ export const CreateTemptation = () => {
 
   const [contentTitle, setContentTitle] = useState('');
   const [categoryType, setCategoryType] = useState('');
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
@@ -51,7 +49,6 @@ export const CreateTemptation = () => {
 
   // Memoize category options and cards to avoid recalculation
   const categoryOptions = useMemo(() => categoriesToSelectOptions(categories), [categories]);
-  const categoryCards = useMemo(() => categoriesToCategoryCards(categories), [categories]);
 
   const handleBack = () => {
     navigate('/content-management');
@@ -82,23 +79,6 @@ export const CreateTemptation = () => {
         };
         reader.readAsDataURL(file);
       });
-    }
-  };
-
-  const toggleCategory = (category: string) => {
-    setExpandedCategories((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(category)) {
-        newSet.delete(category);
-      } else {
-        newSet.add(category);
-      }
-      return newSet;
-    });
-
-    const categoryDoc = categories.find((cat) => getCategoryName(cat) === category);
-    if (categoryDoc) {
-      setCategoryType(categoryDoc.$id);
     }
   };
 
@@ -317,48 +297,6 @@ export const CreateTemptation = () => {
               </div>
 
               {/* Pre-defined Categories */}
-              <div className="flex flex-col gap-3 px-[10%] max-h-[420px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {isLoadingCategories ? (
-                  <div className="text-[#8f8f8f] text-[14px] p-4" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                    Loading categories...
-                  </div>
-                ) : categoriesError ? (
-                  <div className="text-red-400 text-[12px] p-4 whitespace-pre-line" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                    {categoriesError}
-                  </div>
-                ) : categoryCards.length > 0 ? (
-                  categoryCards.map((category) => (
-                    <button
-                      key={category}
-                      onClick={() => toggleCategory(category)}
-                      className={`w-[400px] backdrop-blur-[20px] bg-[rgba(255,255,255,0.07)] rounded-[16px] px-3 py-6 flex items-center justify-between transition ${
-                        expandedCategories.has(category) || categoryType === categories.find(cat => getCategoryName(cat) === category)?.$id ? 'bg-[rgba(255,255,255,0.1)] border border-[#965cdf]' : ''
-                      }`}
-                    >
-                      <span
-                        className="text-white text-[14px] leading-[24px] whitespace-nowrap"
-                        style={{ fontFamily: 'Cinzel, serif', fontWeight: 550 }}
-                      >
-                        {category}
-                      </span>
-                      <div className="bg-[rgba(255,255,255,0.2)] rounded-full w-5 h-5 flex items-center justify-center shrink-0">
-                        <ChevronDownIcon
-                          width={20}
-                          height={20}
-                          color="#fff"
-                          className={`transition-transform ${
-                            expandedCategories.has(category) ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="text-[#8f8f8f] text-[14px] p-4" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                    No categories available
-                  </div>
-                )}
-              </div>
 
               {/* Main Content Audio Players */}
               {(mainContentSupportFile || mainContentRecoveryFile) && (
