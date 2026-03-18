@@ -490,7 +490,7 @@ export const Journey40Day = () => {
                 {tasks.length > 1 && (
                   <button
                     onClick={() => handleRemoveTask(index)}
-                    className="mb-2 p-2 hover:opacity-80 transition"
+                    className="mb-2 p-2 cursor-pointer hover:opacity-80 transition"
                     type="button"
                     aria-label="Remove task"
                   >

@@ -504,7 +504,7 @@ export const CreateTemptation = () => {
                             </div>
                             <button
                               onClick={() => setTranscriptSupportFile(null)}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
                               aria-label="Remove transcript"
                             >
                               <CloseIcon width={24} height={24} color="#8f8f8f" />
@@ -529,7 +529,7 @@ export const CreateTemptation = () => {
                             </div>
                             <button
                               onClick={() => setTranscriptRecoveryFile(null)}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
                               aria-label="Remove transcript"
                             >
                               <CloseIcon width={24} height={24} color="#8f8f8f" />

@@ -196,7 +196,7 @@ export const TranscriptUploadModal: React.FC<TranscriptUploadModalProps> = ({
                     </p>
                     <button
                       onClick={() => removeFile(uploadFile.id)}
-                      className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                      className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
                       aria-label="Remove file"
                     >
                       <CloseIcon

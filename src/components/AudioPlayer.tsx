@@ -425,11 +425,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         </p>
       )}
       <div className="flex gap-4 items-center w-full">
-        <div className="backdrop-blur-[20px] bg-[rgba(255,255,255,0.07)] rounded-[16px] px-4 py-2 flex flex-1 gap-4 items-center min-w-0">
+        <div className="backdrop-blur-[20px] bg-[rgba(255,255,255,0.07)] rounded-4 px-4 py-2 flex flex-1 gap-4 items-center min-w-0">
           <button
             onClick={togglePlay}
             disabled={!audioUrl || !!error}
-            className="shrink-0 w-8 h-8 flex items-center justify-center hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shrink-0 w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
@@ -439,7 +439,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             )}
           </button>
           <p
-            className="text-white text-[12px] leading-[16px] shrink-0 font-roboto font-normal"
+            className="text-white text-[12px] leading-4 shrink-0 font-roboto font-normal"
           >
             {formatTime(displayTime)} / {formatTime(duration)}
           </p>
@@ -479,7 +479,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           <button
             type="button"
             onClick={toggleMute}
-            className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+            className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
             aria-label={isMuted ? 'Unmute' : 'Mute'}
           >
             {isMuted ? (
@@ -492,7 +492,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         {onRemove && (
           <button
             onClick={onRemove}
-            className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+            className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
             aria-label="Remove audio"
           >
             <CloseIcon width={24} height={24} color="#8f8f8f" />
