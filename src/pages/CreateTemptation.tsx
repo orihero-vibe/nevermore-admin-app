@@ -33,6 +33,7 @@ export const CreateTemptation = () => {
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
+  const [uploadPreferredContentType, setUploadPreferredContentType] = useState<string | null>(null);
   
   // New file state based on content types
   const [uploadedImages, setUploadedImages] = useState<Array<{ id: string; src: string; file: File }>>([]);
@@ -82,7 +83,8 @@ export const CreateTemptation = () => {
     }
   };
 
-  const handleUploadButtonClick = () => {
+  const handleUploadButtonClick = (preferredContentType?: string | null) => {
+    setUploadPreferredContentType(preferredContentType ?? null);
     setIsUploadPopupOpen(true);
   };
 
@@ -130,6 +132,7 @@ export const CreateTemptation = () => {
     });
 
     setIsUploadPopupOpen(false);
+    setUploadPreferredContentType(null);
   };
 
 
@@ -382,7 +385,7 @@ export const CreateTemptation = () => {
                   </div>
                   <Button
                     className="w-full h-[56px]"
-                    onClick={handleUploadButtonClick}
+                    onClick={() => handleUploadButtonClick()}
                   >
                     Upload More
                   </Button>
@@ -393,7 +396,7 @@ export const CreateTemptation = () => {
                     className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#965cdf] transition-colors"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, 'image')}
-                    onClick={handleUploadButtonClick}
+                    onClick={() => handleUploadButtonClick()}
                   >
                     <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
                       No image uploaded
@@ -401,7 +404,7 @@ export const CreateTemptation = () => {
                   </div>
                   <Button
                     className="w-full h-[56px]"
-                    onClick={handleUploadButtonClick}
+                    onClick={() => handleUploadButtonClick()}
                   >
                     Upload Files
                   </Button>
@@ -473,7 +476,11 @@ export const CreateTemptation = () => {
                     {(!transcriptSupportFile || !transcriptRecoveryFile) && (
                       <Button
                         className="w-full h-[56px]"
-                        onClick={handleUploadButtonClick}
+                        onClick={() =>
+                          handleUploadButtonClick(
+                            !transcriptSupportFile ? 'supportTranscript' : 'recoveryTranscript'
+                          )
+                        }
                       >
                         Upload {!transcriptSupportFile ? 'Support' : 'Recovery'} Transcript
                       </Button>
@@ -482,7 +489,7 @@ export const CreateTemptation = () => {
                 ) : (
                   <div
                     className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
-                    onClick={handleUploadButtonClick}
+                    onClick={() => handleUploadButtonClick()}
                   >
                     <CloudUploadIcon width={48} height={48} color="#fff" />
                     <div className="text-center">
@@ -537,12 +544,16 @@ export const CreateTemptation = () => {
       {/* File Upload Popup */}
       <FileUploadPopup
         isOpen={isUploadPopupOpen}
-        onClose={() => setIsUploadPopupOpen(false)}
+        onClose={() => {
+          setIsUploadPopupOpen(false);
+          setUploadPreferredContentType(null);
+        }}
         onUpload={handleUploadComplete}
         accept="*"
         title="Upload Files"
         supportedFormats="Images, Audio (MP3, WAV, M4A), Documents (PDF, DOC, DOCX)"
         contentTypes={contentTypeOptions}
+        preferredContentType={uploadPreferredContentType}
       />
     </div>
   );

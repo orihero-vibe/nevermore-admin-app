@@ -350,7 +350,7 @@ export const Journey40Day = () => {
             className="text-white text-[24px] leading-[normal]"
             style={{ fontFamily: 'Cinzel, serif', fontWeight: 400 }}
           >
-            {isEditMode ? 'Content Details' : 'Upload New Journey'}
+            {isEditMode ? 'Content Details' : '40 DAY JOURNEY'}
           </h1>
         </div>
         {isEditMode && (

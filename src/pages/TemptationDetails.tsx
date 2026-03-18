@@ -72,6 +72,7 @@ export const TemptationDetails = () => {
   const [originalContentData, setOriginalContentData] = useState<ContentDocument | null>(null);
   const [originalTitle, setOriginalTitle] = useState('');
   const [originalCategory, setOriginalCategory] = useState('');
+  const [uploadPreferredContentType, setUploadPreferredContentType] = useState<string | null>(null);
 
   // Fetch categories on mount (only once, centrally managed)
   useEffect(() => {
@@ -435,7 +436,8 @@ export const TemptationDetails = () => {
     }
   };
 
-  const handleUploadButtonClick = () => {
+  const handleUploadButtonClick = (preferredContentType?: string | null) => {
+    setUploadPreferredContentType(preferredContentType ?? null);
     setIsUploadPopupOpen(true);
   };
 
@@ -481,6 +483,7 @@ export const TemptationDetails = () => {
     });
 
     setIsUploadPopupOpen(false);
+    setUploadPreferredContentType(null);
   };
 
   const handleRemoveImage = (imageId: string) => {
@@ -554,7 +557,7 @@ export const TemptationDetails = () => {
                     <input
                       value={contentTitle}
                       onChange={(e) => setContentTitle(e.target.value)}
-                      placeholder=" "
+                      placeholder="Enter content title"
                       disabled={!isEditing}
                       className="w-full bg-transparent border-none text-white focus:outline-none placeholder-[#616161] disabled:opacity-60 disabled:cursor-not-allowed"
                       style={{ 
@@ -568,7 +571,7 @@ export const TemptationDetails = () => {
                 </div>
                 <Button
                   className="w-[120px] h-[56px]"
-                  onClick={handleUploadButtonClick}
+                  onClick={() => handleUploadButtonClick()}
                   disabled={!isEditing}
                 >
                   Upload Files
@@ -734,7 +737,7 @@ export const TemptationDetails = () => {
                     </div>
                     <Button
                       className="w-full h-[56px]"
-                      onClick={handleUploadButtonClick}
+                      onClick={() => handleUploadButtonClick()}
                       disabled={!isEditing}
                     >
                       Upload More Images
@@ -746,7 +749,7 @@ export const TemptationDetails = () => {
                       className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#965cdf] transition-colors"
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, 'image')}
-                      onClick={isEditing ? handleUploadButtonClick : undefined}
+                      onClick={isEditing ? () => handleUploadButtonClick() : undefined}
                     >
                       <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
                         No image uploaded
@@ -754,7 +757,7 @@ export const TemptationDetails = () => {
                     </div>
                     <Button
                       className="w-full h-[56px]"
-                      onClick={handleUploadButtonClick}
+                      onClick={() => handleUploadButtonClick()}
                       disabled={!isEditing}
                     >
                       Upload Files
@@ -841,7 +844,13 @@ export const TemptationDetails = () => {
                     {(!transcriptSupportFile && !transcriptSupportUrl) || (!transcriptRecoveryFile && !transcriptRecoveryUrl) ? (
                       <Button
                         className="w-full h-[56px]"
-                        onClick={handleUploadButtonClick}
+                        onClick={() =>
+                          handleUploadButtonClick(
+                            !transcriptSupportFile && !transcriptSupportUrl
+                              ? 'supportTranscript'
+                              : 'recoveryTranscript'
+                          )
+                        }
                         disabled={!isEditing}
                       >
                         Upload {!transcriptSupportFile && !transcriptSupportUrl ? 'Support' : 'Recovery'} Transcript
@@ -851,7 +860,7 @@ export const TemptationDetails = () => {
                 ) : (
                   <div
                     className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
-                    onClick={isEditing ? handleUploadButtonClick : undefined}
+                    onClick={isEditing ? () => handleUploadButtonClick() : undefined}
                   >
                     <CloudUploadIcon width={48} height={48} color="#fff" />
                     <div className="text-center">
@@ -880,12 +889,16 @@ export const TemptationDetails = () => {
       {/* File Upload Popup */}
       <FileUploadPopup
         isOpen={isUploadPopupOpen}
-        onClose={() => setIsUploadPopupOpen(false)}
+        onClose={() => {
+          setIsUploadPopupOpen(false);
+          setUploadPreferredContentType(null);
+        }}
         onUpload={handleUploadComplete}
         accept="*"
         title="Upload Files"
         supportedFormats="Images, Audio (MP3, WAV, M4A), Documents (PDF, DOC, DOCX)"
         contentTypes={contentTypeOptions}
+        preferredContentType={uploadPreferredContentType}
       />
 
       {/* Delete Confirmation Modal */}
