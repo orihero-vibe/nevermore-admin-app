@@ -249,7 +249,7 @@ export const CreateTemptation = () => {
           <div className="flex gap-16 items-start">
             {/* Left Column - Form Fields */}
             <div className="flex-1 flex flex-col gap-10">
-              {/* Content Title with Upload Audio Files Button */}
+              {/* Content Title */}
               <div className="flex items-end justify-between gap-4">
                 <div className="flex-1 flex flex-col gap-2">
                   <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
@@ -258,7 +258,7 @@ export const CreateTemptation = () => {
                   <input
                     value={contentTitle}
                     onChange={(e) => setContentTitle(e.target.value)}
-                    placeholder=" "
+                    placeholder="Enter content title"
                     className="w-full h-[56px] bg-transparent border border-[#965cdf] rounded-[16px] px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#965cdf] placeholder-[#616161]"
                     style={{ 
                       fontFamily: 'Roboto, sans-serif',
@@ -267,12 +267,6 @@ export const CreateTemptation = () => {
                     }}
                   />
                 </div>
-                <Button
-                  className="w-[200px] h-[56px] shrink-0"
-                  onClick={handleUploadButtonClick}
-                >
-                  Upload Files
-                </Button>
               </div>
 
               {/* Category Type */}
