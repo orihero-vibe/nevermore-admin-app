@@ -60,12 +60,7 @@ export const LinkSent = () => {
 
           {/* Success Message */}
           <p className="text-sm text-white mb-8 text-center font-normal">
-            A link to reset your password has been sent to your email.
-            {email && (
-              <span className="block mt-2 text-[#8A4DBC]">
-                {email}
-              </span>
-            )}
+            A link to reset your password has been sent.
           </p>
 
           {/* Resend Success Message */}
