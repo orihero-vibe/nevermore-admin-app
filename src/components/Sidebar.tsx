@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserProfile } from './UserProfile';
 import ContentManagementIcon from '../assets/icons/content-management';
-import CheckCircleIcon from '../assets/icons/check-circle';
 import SettingsIcon from '../assets/icons/settings';
 import SignOutIcon from '../assets/icons/sign-out';
 import { useStore } from '../store';
@@ -12,11 +11,6 @@ const navigationItems = [
     path: '/content-management',
     name: 'Content Management',
     icon: ContentManagementIcon,
-  },
-  {
-    path: '/free-content',
-    name: 'Free content',
-    icon: CheckCircleIcon,
   },
   {
     path: '/settings',
@@ -35,7 +29,7 @@ export const Sidebar = () => {
       await signOut();
       showSuccess('Signed out successfully');
       navigate('/signin', { replace: true });
-    } catch (error) {
+    } catch {
       // Error is already handled in the store and shown via notifications
       // Still navigate to signin even if sign out fails
       navigate('/signin', { replace: true });

@@ -27,7 +27,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [_isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
@@ -294,10 +294,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           await audio.play();
           setIsPlaying(true);
           setError(null);
-        } catch (playError: any) {
+        } catch (playError: unknown) {
           console.error('Play error:', playError);
           audioManager.pause(playerId);
-          if (playError.name === 'NotAllowedError') {
+          const name =
+            playError && typeof playError === 'object' && 'name' in playError
+              ? String((playError as { name?: unknown }).name)
+              : '';
+          if (name === 'NotAllowedError') {
             setError('Autoplay blocked. Please click play again.');
           } else {
             setError('Failed to play audio.');
@@ -305,7 +309,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           setIsPlaying(false);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error in togglePlay:', error);
       audioManager.pause(playerId);
       setError('Failed to play audio. Please try again.');
@@ -441,7 +445,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           <p
             className="text-white text-[12px] leading-4 shrink-0 font-roboto font-normal"
           >
-            {formatTime(displayTime)} / {formatTime(duration)}
+            {isLoading ? 'Loading…' : `${formatTime(displayTime)} / ${formatTime(duration)}`}
           </p>
           <div className="flex-1 min-w-0 relative py-2 -my-2">
             <div

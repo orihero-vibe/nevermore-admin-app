@@ -16,7 +16,6 @@ interface JourneyData {
   tasks?: string[];
   hasAudio?: boolean;
   day?: number;
-  isFree?: boolean;
 }
 
 export const Journey40Day = () => {
@@ -41,7 +40,6 @@ export const Journey40Day = () => {
   const [originalTitle, setOriginalTitle] = useState('');
   const [originalDay, setOriginalDay] = useState<number | ''>('');
   const [originalTasks, setOriginalTasks] = useState<string[]>([]);
-  const [isFree, setIsFree] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -55,7 +53,6 @@ export const Journey40Day = () => {
           const contentDoc = await fetchContentById(idToLoad);
           if (contentDoc) {
             setOriginalContentData(contentDoc);
-            setIsFree(!!contentDoc.isFree);
             // Load audio files from URLs
             if (contentDoc.files && contentDoc.files.length > 0) {
               setUploadedAudioUrls(contentDoc.files);
@@ -92,9 +89,6 @@ export const Journey40Day = () => {
         } else {
           setTasks(['']);
           setOriginalTasks([]);
-        }
-        if (journeyData.isFree !== undefined) {
-          setIsFree(journeyData.isFree);
         }
       }
     };
@@ -150,7 +144,6 @@ export const Journey40Day = () => {
     const titleChanged = contentTitle.trim() !== originalTitle.trim();
     const dayChanged = day !== originalDay;
     const tasksChanged = JSON.stringify(tasks.filter(t => t.trim())) !== JSON.stringify(originalTasks.filter(t => t.trim()));
-    const isFreeChanged = isFree !== (originalContentData?.isFree ?? false);
     
     // Check if new files were uploaded
     const newAudioUploaded = uploadedAudioFiles.length > 0;
@@ -160,7 +153,7 @@ export const Journey40Day = () => {
     
     const filesChanged = newAudioUploaded || audioRemoved;
     
-    return titleChanged || dayChanged || tasksChanged || filesChanged || isFreeChanged;
+    return titleChanged || dayChanged || tasksChanged || filesChanged;
   };
 
   const handleSave = async () => {
@@ -200,7 +193,6 @@ export const Journey40Day = () => {
           title: contentTitle.trim(),
           type: 'forty_day_journey',
           day: day !== '' ? Number(day) : undefined,
-          isFree: day === 1 || day === 2 || day === 3 ? isFree : false,
         },
         [], // No images for 40-day journey
         uploadedAudioFiles,
@@ -282,7 +274,6 @@ export const Journey40Day = () => {
           title: contentTitle.trim(),
           type: 'forty_day_journey', // Content type: forty_day_journey
           day: day !== '' ? Number(day) : undefined, // Day number for 40-day journey
-          isFree: day === 1 || day === 2 || day === 3 ? isFree : false,
         },
         [], // No images for 40-day journey
         uploadedAudioFiles, // Audio files - uploaded to storage
@@ -439,28 +430,6 @@ export const Journey40Day = () => {
                 disabled={isEditMode ? !isEditing : false}
                 className="h-[56px] bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf]"
               />
-            </div>
-
-            {/* Free (only for Day 1–3) */}
-            <div className="w-full flex flex-col gap-2">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="journey-is-free"
-                  checked={isFree}
-                  onChange={(e) => setIsFree(e.target.checked)}
-                  disabled={(day !== 1 && day !== 2 && day !== 3) || (isEditMode && !isEditing)}
-                  className="h-5 w-5 rounded border-[rgba(255,255,255,0.25)] bg-[#131313] text-[#965cdf] focus:ring-2 focus:ring-[#965cdf] disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <label htmlFor="journey-is-free" className="text-white text-[14px] leading-[20px] font-roboto font-normal cursor-pointer">
-                  Free (no subscription required)
-                </label>
-              </div>
-              {(day !== 1 && day !== 2 && day !== 3) && day !== '' && (
-                <p className="text-[#8f8f8f] text-[12px] leading-[16px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                  Only Day 1–3 can be marked as free.
-                </p>
-              )}
             </div>
 
             {/* Audio Players */}

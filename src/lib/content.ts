@@ -16,8 +16,6 @@ export interface ContentData {
   transcripts?: string[]; // Array of URLs (for multiple transcript files)
   tasks?: string[]; // Array of strings (for 40 Day Journey)
   day?: number; // Day number (for 40 Day Journey)
-  /** If true, this item is free (no subscription). For 40-day journey, only Day 1–3 may be free. */
-  isFree?: boolean;
   // New fields for 40 Temptations
   mainContentRecoveryURL?: string; // Single URL for Main Content (Recovery) audio
   mainContentSupportURL?: string; // Single URL for Main Content (Support) audio
@@ -159,14 +157,6 @@ export async function createContent(contentData: ContentData): Promise<string> {
       throw new Error('Content type is required');
     }
 
-    // Journey: only day 1, 2, or 3 can be marked free
-    if (contentData.type === 'forty_day_journey' && contentData.isFree === true) {
-      const day = contentData.day;
-      if (day !== 1 && day !== 2 && day !== 3) {
-        throw new Error('Only Day 1, 2, or 3 can be marked as free.');
-      }
-    }
-
     // Prepare the document data
     const documentData: Record<string, unknown> = {
       title: contentData.title,
@@ -192,10 +182,6 @@ export async function createContent(contentData: ContentData): Promise<string> {
 
     if (contentData.day !== undefined) {
       documentData.day = contentData.day;
-    }
-
-    if (contentData.isFree !== undefined) {
-      documentData.isFree = contentData.isFree;
     }
 
     if (contentData.transcript) {
@@ -430,7 +416,6 @@ export interface ContentDocument {
   transcripts?: string[]; // Array of URLs (for multiple transcript files)
   tasks?: string[];
   day?: number; // Day number (for 40 Day Journey)
-  isFree?: boolean;
   // New fields for 40 Temptations
   mainContentRecoveryURL?: string;
   mainContentSupportURL?: string;
@@ -471,14 +456,6 @@ export async function updateContent(
       throw new Error('Content type is required');
     }
 
-    // Journey: only day 1, 2, or 3 can be marked free
-    if (contentData.type === 'forty_day_journey' && contentData.isFree === true) {
-      const day = contentData.day;
-      if (day !== 1 && day !== 2 && day !== 3) {
-        throw new Error('Only Day 1, 2, or 3 can be marked as free.');
-      }
-    }
-
     // Prepare the document data
     const documentData: Record<string, unknown> = {
       title: contentData.title,
@@ -508,10 +485,6 @@ export async function updateContent(
 
     if (contentData.day !== undefined) {
       documentData.day = contentData.day;
-    }
-
-    if (contentData.isFree !== undefined) {
-      documentData.isFree = contentData.isFree;
     }
 
     // Handle new fields for 40 Temptations

@@ -8,10 +8,6 @@ export interface Category {
   title?: string;
   label?: string;
   order?: number;
-  /** Content $id that is free in this category. At most 3 categories should have this set. */
-  freeTemptationContentId?: string | null;
-  /** Convenience flag for admin UI; can be derived from freeTemptationContentId != null */
-  isFreeCategory?: boolean;
   [key: string]: unknown;
 }
 
@@ -164,48 +160,13 @@ export function categoriesToCategoryCards(
   return categories.map((category) => ({ id: category.$id, name: getCategoryName(category) }));
 }
 
-/**
- * Count how many categories have a free temptation set
- */
-export function countCategoriesWithFreeTemptation(categories: Category[]): number {
-  return categories.filter(
-    (c) => c.freeTemptationContentId != null && String(c.freeTemptationContentId).trim() !== ''
-  ).length;
-}
-
-const MAX_CATEGORIES_WITH_FREE_TEMPTATION = 3;
-
-/**
- * Validates that setting freeTemptationContentId on a category would not exceed the limit of 3.
- * Call before updateCategory when setting a non-null freeTemptationContentId.
- * @throws Error if the limit would be exceeded
- */
-export function validateFreeTemptationLimit(
-  categories: Category[],
-  categoryIdBeingUpdated: string,
-  newFreeContentId: string | null
-): void {
-  if (newFreeContentId == null || String(newFreeContentId).trim() === '') {
-    return; // Clearing is always allowed
-  }
-  const category = categories.find((c) => c.$id === categoryIdBeingUpdated);
-  const alreadyHadFree = category && category.freeTemptationContentId != null && String(category.freeTemptationContentId).trim() !== '';
-  const currentCount = countCategoriesWithFreeTemptation(categories);
-  const newCount = alreadyHadFree ? currentCount : currentCount + 1;
-  if (newCount > MAX_CATEGORIES_WITH_FREE_TEMPTATION) {
-    throw new Error(
-      `At most ${MAX_CATEGORIES_WITH_FREE_TEMPTATION} categories can have a free temptation. Clear one to assign another.`
-    );
-  }
-}
-
 export interface UpdateCategoryData {
-  freeTemptationContentId?: string | null;
-  isFreeCategory?: boolean;
+  /** Arbitrary category fields that are safe to update from admin UI. */
+  [key: string]: unknown;
 }
 
 /**
- * Update a category's free-content fields in Appwrite
+ * Update a category in Appwrite
  */
 export async function updateCategory(
   categoryId: string,
@@ -221,21 +182,14 @@ export async function updateCategory(
       'VITE_APPWRITE_CATEGORY_COLLECTION_ID is not set in environment variables. Please add it to your .env file.'
     );
   }
-  const payload: Record<string, unknown> = {};
-  if (data.freeTemptationContentId !== undefined) {
-    payload.freeTemptationContentId = data.freeTemptationContentId;
-  }
-  if (data.isFreeCategory !== undefined) {
-    payload.isFreeCategory = data.isFreeCategory;
-  }
-  if (Object.keys(payload).length === 0) {
+  if (!data || Object.keys(data).length === 0) {
     return;
   }
   await tablesDB.updateRow({
     databaseId: DATABASE_ID,
     tableId: CATEGORY_COLLECTION_ID,
     rowId: categoryId,
-    data: payload,
+    data,
   });
 }
 
