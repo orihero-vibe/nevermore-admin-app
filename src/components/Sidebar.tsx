@@ -29,7 +29,7 @@ export const Sidebar = () => {
       await signOut();
       showSuccess('Signed out successfully');
       navigate('/signin', { replace: true });
-    } catch (error) {
+    } catch {
       // Error is already handled in the store and shown via notifications
       // Still navigate to signin even if sign out fails
       navigate('/signin', { replace: true });

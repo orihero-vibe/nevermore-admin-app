@@ -68,9 +68,11 @@ export const TemptationDetails = () => {
   const [saveProgress, setSaveProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [originalContentData, setOriginalContentData] = useState<ContentDocument | null>(null);
   const [originalTitle, setOriginalTitle] = useState('');
   const [originalCategory, setOriginalCategory] = useState('');
+  const [uploadPreferredContentType, setUploadPreferredContentType] = useState<string | null>(null);
 
   // Fetch categories on mount (only once, centrally managed)
   useEffect(() => {
@@ -408,6 +410,10 @@ export const TemptationDetails = () => {
     }
   };
 
+  const handleEdit = () => {
+    if (!temptationData?.id) return;
+    setIsEditing(true);
+  };
 
   const handleDelete = () => {
     setIsDeleteModalOpen(true);
@@ -430,7 +436,8 @@ export const TemptationDetails = () => {
     }
   };
 
-  const handleUploadButtonClick = () => {
+  const handleUploadButtonClick = (preferredContentType?: string | null) => {
+    setUploadPreferredContentType(preferredContentType ?? null);
     setIsUploadPopupOpen(true);
   };
 
@@ -476,6 +483,7 @@ export const TemptationDetails = () => {
     });
 
     setIsUploadPopupOpen(false);
+    setUploadPreferredContentType(null);
   };
 
   const handleRemoveImage = (imageId: string) => {
@@ -505,10 +513,14 @@ export const TemptationDetails = () => {
         <div className="flex items-center gap-4">
           <Button
             className="w-[120px] h-[56px]"
-            onClick={handleSave}
-            disabled={isSaving || !temptationData?.id}
+            onClick={isEditing ? handleSave : handleEdit}
+            disabled={
+              isSaving ||
+              !temptationData?.id ||
+              (isEditing && !hasUnsavedChanges())
+            }
           >
-            {isSaving ? `Saving... ${saveProgress}%` : hasUnsavedChanges() ? 'Save' : 'Edit'}
+            {isSaving ? `Saving... ${saveProgress}%` : isEditing ? 'Save' : 'Edit'}
           </Button>
           {isSaving && saveProgress > 0 && saveProgress < 100 && (
             <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
@@ -522,7 +534,7 @@ export const TemptationDetails = () => {
             variant="outline"
             className="w-[120px] h-[56px]"
             onClick={handleDelete}
-            disabled={isSaving || isDeleting}
+            disabled={isSaving || isDeleting || !temptationData?.id}
           >
             {isDeleting ? 'Deleting...' : 'Delete'}
           </Button>
@@ -545,8 +557,9 @@ export const TemptationDetails = () => {
                     <input
                       value={contentTitle}
                       onChange={(e) => setContentTitle(e.target.value)}
-                      placeholder=" "
-                      className="w-full bg-transparent border-none text-white focus:outline-none placeholder-[#616161]"
+                      placeholder="Enter content title"
+                      disabled={!isEditing}
+                      className="w-full bg-transparent border-none text-white focus:outline-none placeholder-[#616161] disabled:opacity-60 disabled:cursor-not-allowed"
                       style={{ 
                         fontFamily: 'Cinzel, serif', 
                         fontWeight: 400,
@@ -558,7 +571,8 @@ export const TemptationDetails = () => {
                 </div>
                 <Button
                   className="w-[120px] h-[56px]"
-                  onClick={handleUploadButtonClick}
+                  onClick={() => handleUploadButtonClick()}
+                  disabled={!isEditing}
                 >
                   Upload Files
                 </Button>
@@ -577,12 +591,14 @@ export const TemptationDetails = () => {
                     </span>
                   )}
                 </label>
-                <Select
-                  options={categoryOptions}
-                  value={categoryType}
-                  onChange={setCategoryType}
-                  placeholder={isLoadingCategories ? 'Loading categories...' : 'Select Category'}
-                />
+                <div className={!isEditing ? 'pointer-events-none opacity-60' : undefined}>
+                  <Select
+                    options={categoryOptions}
+                    value={categoryType}
+                    onChange={setCategoryType}
+                    placeholder={isLoadingCategories ? 'Loading categories...' : 'Select Category'}
+                  />
+                </div>
               </div>
 
               {/* Main Content Audio Players */}
@@ -595,10 +611,14 @@ export const TemptationDetails = () => {
                       label="Main Content (Support)"
                       file={mainContentSupportFile || undefined}
                       url={mainContentSupportFile ? undefined : mainContentSupportUrl || undefined}
-                      onRemove={() => {
-                        setMainContentSupportFile(null);
-                        setMainContentSupportUrl(null);
-                      }}
+                      onRemove={
+                        isEditing
+                          ? () => {
+                              setMainContentSupportFile(null);
+                              setMainContentSupportUrl(null);
+                            }
+                          : undefined
+                      }
                     />
                   )}
                   {/* Main Content (Recovery) */}
@@ -608,10 +628,14 @@ export const TemptationDetails = () => {
                       label="Main Content (Recovery)"
                       file={mainContentRecoveryFile || undefined}
                       url={mainContentRecoveryFile ? undefined : mainContentRecoveryUrl || undefined}
-                      onRemove={() => {
-                        setMainContentRecoveryFile(null);
-                        setMainContentRecoveryUrl(null);
-                      }}
+                      onRemove={
+                        isEditing
+                          ? () => {
+                              setMainContentRecoveryFile(null);
+                              setMainContentRecoveryUrl(null);
+                            }
+                          : undefined
+                      }
                     />
                   )}
                 </div>
@@ -626,13 +650,17 @@ export const TemptationDetails = () => {
                       key={`question-new-${file.name}-${index}`}
                       label={`Question ${index + 1}`}
                       file={file}
-                      onRemove={() => {
-                        setQuestionAudioFiles((prev) => {
-                          const newFiles = [...prev];
-                          newFiles.splice(index, 1);
-                          return newFiles;
-                        });
-                      }}
+                      onRemove={
+                        isEditing
+                          ? () => {
+                              setQuestionAudioFiles((prev) => {
+                                const newFiles = [...prev];
+                                newFiles.splice(index, 1);
+                                return newFiles;
+                              });
+                            }
+                          : undefined
+                      }
                     />
                   ))}
                   {/* Existing question audio URLs */}
@@ -641,9 +669,13 @@ export const TemptationDetails = () => {
                       key={`question-existing-${index}`}
                       label={`Question ${questionAudioFiles.length + index + 1}`}
                       url={url}
-                      onRemove={() => {
-                        setQuestionAudioUrls((prev) => prev.filter((_, i) => i !== index));
-                      }}
+                      onRemove={
+                        isEditing
+                          ? () => {
+                              setQuestionAudioUrls((prev) => prev.filter((_, i) => i !== index));
+                            }
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -669,8 +701,9 @@ export const TemptationDetails = () => {
                           {/* Remove Button */}
                           <button
                             onClick={() => handleRemoveImage(uploadedImages[0].id)}
-                            className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer"
+                            className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label="Remove image"
+                            disabled={!isEditing}
                           >
                             <DeleteIcon width={16} height={16} color="#fff" />
                           </button>
@@ -691,8 +724,9 @@ export const TemptationDetails = () => {
                               {/* Remove Button */}
                               <button
                                 onClick={() => handleRemoveImage(image.id)}
-                                className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer"
+                                className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 aria-label="Remove image"
+                                disabled={!isEditing}
                               >
                                 <DeleteIcon width={16} height={16} color="#fff" />
                               </button>
@@ -703,7 +737,8 @@ export const TemptationDetails = () => {
                     </div>
                     <Button
                       className="w-full h-[56px]"
-                      onClick={handleUploadButtonClick}
+                      onClick={() => handleUploadButtonClick()}
+                      disabled={!isEditing}
                     >
                       Upload More Images
                     </Button>
@@ -714,7 +749,7 @@ export const TemptationDetails = () => {
                       className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#965cdf] transition-colors"
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, 'image')}
-                      onClick={handleUploadButtonClick}
+                      onClick={isEditing ? () => handleUploadButtonClick() : undefined}
                     >
                       <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
                         No image uploaded
@@ -722,7 +757,8 @@ export const TemptationDetails = () => {
                     </div>
                     <Button
                       className="w-full h-[56px]"
-                      onClick={handleUploadButtonClick}
+                      onClick={() => handleUploadButtonClick()}
+                      disabled={!isEditing}
                     >
                       Upload Files
                     </Button>
@@ -763,8 +799,9 @@ export const TemptationDetails = () => {
                                 setTranscriptSupportUrl(null);
                                 setTranscriptSupportFileName(null);
                               }}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
                               aria-label="Remove transcript"
+                              disabled={!isEditing}
                             >
                               <CloseIcon width={24} height={24} color="#8f8f8f" />
                             </button>
@@ -793,8 +830,9 @@ export const TemptationDetails = () => {
                                 setTranscriptRecoveryUrl(null);
                                 setTranscriptRecoveryFileName(null);
                               }}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
                               aria-label="Remove transcript"
+                              disabled={!isEditing}
                             >
                               <CloseIcon width={24} height={24} color="#8f8f8f" />
                             </button>
@@ -806,7 +844,14 @@ export const TemptationDetails = () => {
                     {(!transcriptSupportFile && !transcriptSupportUrl) || (!transcriptRecoveryFile && !transcriptRecoveryUrl) ? (
                       <Button
                         className="w-full h-[56px]"
-                        onClick={handleUploadButtonClick}
+                        onClick={() =>
+                          handleUploadButtonClick(
+                            !transcriptSupportFile && !transcriptSupportUrl
+                              ? 'supportTranscript'
+                              : 'recoveryTranscript'
+                          )
+                        }
+                        disabled={!isEditing}
                       >
                         Upload {!transcriptSupportFile && !transcriptSupportUrl ? 'Support' : 'Recovery'} Transcript
                       </Button>
@@ -815,7 +860,7 @@ export const TemptationDetails = () => {
                 ) : (
                   <div
                     className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
-                    onClick={handleUploadButtonClick}
+                    onClick={isEditing ? () => handleUploadButtonClick() : undefined}
                   >
                     <CloudUploadIcon width={48} height={48} color="#fff" />
                     <div className="text-center">
@@ -844,12 +889,16 @@ export const TemptationDetails = () => {
       {/* File Upload Popup */}
       <FileUploadPopup
         isOpen={isUploadPopupOpen}
-        onClose={() => setIsUploadPopupOpen(false)}
+        onClose={() => {
+          setIsUploadPopupOpen(false);
+          setUploadPreferredContentType(null);
+        }}
         onUpload={handleUploadComplete}
         accept="*"
         title="Upload Files"
         supportedFormats="Images, Audio (MP3, WAV, M4A), Documents (PDF, DOC, DOCX)"
         contentTypes={contentTypeOptions}
+        preferredContentType={uploadPreferredContentType}
       />
 
       {/* Delete Confirmation Modal */}

@@ -19,6 +19,11 @@ export interface FileUploadPopupProps {
   onUpload: (files: UploadFile[]) => void | Promise<void>;
   accept?: string;
   contentTypes: SelectOption[];
+  /**
+   * Optional hint to force the initial content type for newly added files.
+   * Used to fix transcript flows (e.g. "Upload Recovery Transcript").
+   */
+  preferredContentType?: string | null;
   maxFiles?: number;
   title?: string;
   supportedFormats?: string;
@@ -30,6 +35,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
   onUpload,
   accept = '*',
   contentTypes,
+  preferredContentType = null,
   maxFiles,
   title = 'Upload',
   supportedFormats = 'JPEG, PNG, GIF, MP4, PDF, PSD, AI, Word, PPT',
@@ -183,6 +189,31 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
 
       // Handle transcript files - allow max 2 total (one of each type)
       if (transcriptTypes.includes(detectedType)) {
+        // If the parent opened the popup in a "specific transcript" mode,
+        // force all added transcript files to that type.
+        if (preferredContentType && transcriptTypes.includes(preferredContentType)) {
+          const hasPreferredExisting = uploadFiles.some(
+            (uf) => uf.contentType === preferredContentType
+          );
+          const hasPreferredInNew = newFiles.some(
+            (uf) => uf.contentType === preferredContentType
+          );
+
+          if (hasPreferredExisting || hasPreferredInNew) {
+            discardedCount++;
+            return;
+          }
+
+          newFiles.push({
+            id: `${Date.now()}-${Math.random()}`,
+            file,
+            progress: 0,
+            contentType: preferredContentType,
+          });
+          newTranscriptCount++;
+          return;
+        }
+
         const totalTranscripts = existingTranscriptCount + newTranscriptCount;
         if (totalTranscripts >= 2) {
           discardedCount++;
@@ -376,7 +407,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
                       </p>
                       <button
                         onClick={() => removeFile(uploadFile.id)}
-                        className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                        className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
                         aria-label="Remove file"
                       >
                         <CloseIcon

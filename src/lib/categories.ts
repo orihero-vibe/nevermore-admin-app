@@ -8,7 +8,6 @@ export interface Category {
   title?: string;
   label?: string;
   order?: number;
-  // Add other fields as needed based on your AppWrite schema
   [key: string]: unknown;
 }
 
@@ -151,11 +150,46 @@ export function categoriesToSelectOptions(categories: Category[]): SelectOption[
 }
 
 /**
- * Converts categories to category cards array (just names)
+ * Converts categories to category cards data
  * @param categories Array of category documents
- * @returns string[] Array of category names
+ * @returns Array of objects with stable id + display name
  */
-export function categoriesToCategoryCards(categories: Category[]): string[] {
-  return categories.map((category) => getCategoryName(category));
+export function categoriesToCategoryCards(
+  categories: Category[]
+): Array<{ id: string; name: string }> {
+  return categories.map((category) => ({ id: category.$id, name: getCategoryName(category) }));
+}
+
+export interface UpdateCategoryData {
+  /** Arbitrary category fields that are safe to update from admin UI. */
+  [key: string]: unknown;
+}
+
+/**
+ * Update a category in Appwrite
+ */
+export async function updateCategory(
+  categoryId: string,
+  data: UpdateCategoryData
+): Promise<void> {
+  if (!DATABASE_ID) {
+    throw new Error(
+      'VITE_APPWRITE_DATABASE_ID is not set in environment variables. Please add it to your .env file.'
+    );
+  }
+  if (!CATEGORY_COLLECTION_ID) {
+    throw new Error(
+      'VITE_APPWRITE_CATEGORY_COLLECTION_ID is not set in environment variables. Please add it to your .env file.'
+    );
+  }
+  if (!data || Object.keys(data).length === 0) {
+    return;
+  }
+  await tablesDB.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: CATEGORY_COLLECTION_ID,
+    rowId: categoryId,
+    data,
+  });
 }
 

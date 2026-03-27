@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
-import ChevronDownIcon from '../assets/icons/chevron-down';
 import CloudUploadIcon from '../assets/icons/cloud-upload';
 import CloseIcon from '../assets/icons/close';
 import { Select } from '../components/Select';
@@ -9,7 +8,7 @@ import type { SelectOption } from '../components/Select';
 import { Button } from '../components/Button';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { FileUploadPopup, type UploadFile } from '../components/FileUploadPopup';
-import { categoriesToSelectOptions, categoriesToCategoryCards, getCategoryName } from '../lib/categories';
+import { categoriesToSelectOptions } from '../lib/categories';
 import { publishContent, type TemptationFiles } from '../lib/content';
 import { showAppwriteError } from '../lib/notifications';
 import DeleteIcon from '@/assets/icons/delete';
@@ -31,10 +30,10 @@ export const CreateTemptation = () => {
 
   const [contentTitle, setContentTitle] = useState('');
   const [categoryType, setCategoryType] = useState('');
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
+  const [uploadPreferredContentType, setUploadPreferredContentType] = useState<string | null>(null);
   
   // New file state based on content types
   const [uploadedImages, setUploadedImages] = useState<Array<{ id: string; src: string; file: File }>>([]);
@@ -51,7 +50,6 @@ export const CreateTemptation = () => {
 
   // Memoize category options and cards to avoid recalculation
   const categoryOptions = useMemo(() => categoriesToSelectOptions(categories), [categories]);
-  const categoryCards = useMemo(() => categoriesToCategoryCards(categories), [categories]);
 
   const handleBack = () => {
     navigate('/content-management');
@@ -85,24 +83,8 @@ export const CreateTemptation = () => {
     }
   };
 
-  const toggleCategory = (category: string) => {
-    setExpandedCategories((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(category)) {
-        newSet.delete(category);
-      } else {
-        newSet.add(category);
-      }
-      return newSet;
-    });
-
-    const categoryDoc = categories.find((cat) => getCategoryName(cat) === category);
-    if (categoryDoc) {
-      setCategoryType(categoryDoc.$id);
-    }
-  };
-
-  const handleUploadButtonClick = () => {
+  const handleUploadButtonClick = (preferredContentType?: string | null) => {
+    setUploadPreferredContentType(preferredContentType ?? null);
     setIsUploadPopupOpen(true);
   };
 
@@ -150,6 +132,7 @@ export const CreateTemptation = () => {
     });
 
     setIsUploadPopupOpen(false);
+    setUploadPreferredContentType(null);
   };
 
 
@@ -269,7 +252,7 @@ export const CreateTemptation = () => {
           <div className="flex gap-16 items-start">
             {/* Left Column - Form Fields */}
             <div className="flex-1 flex flex-col gap-10">
-              {/* Content Title with Upload Audio Files Button */}
+              {/* Content Title */}
               <div className="flex items-end justify-between gap-4">
                 <div className="flex-1 flex flex-col gap-2">
                   <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
@@ -278,7 +261,7 @@ export const CreateTemptation = () => {
                   <input
                     value={contentTitle}
                     onChange={(e) => setContentTitle(e.target.value)}
-                    placeholder=" "
+                    placeholder="Enter content title"
                     className="w-full h-[56px] bg-transparent border border-[#965cdf] rounded-[16px] px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#965cdf] placeholder-[#616161]"
                     style={{ 
                       fontFamily: 'Roboto, sans-serif',
@@ -287,12 +270,6 @@ export const CreateTemptation = () => {
                     }}
                   />
                 </div>
-                <Button
-                  className="w-[200px] h-[56px] shrink-0"
-                  onClick={handleUploadButtonClick}
-                >
-                  Upload Files
-                </Button>
               </div>
 
               {/* Category Type */}
@@ -317,48 +294,6 @@ export const CreateTemptation = () => {
               </div>
 
               {/* Pre-defined Categories */}
-              <div className="flex flex-col gap-3 px-[10%] max-h-[420px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {isLoadingCategories ? (
-                  <div className="text-[#8f8f8f] text-[14px] p-4" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                    Loading categories...
-                  </div>
-                ) : categoriesError ? (
-                  <div className="text-red-400 text-[12px] p-4 whitespace-pre-line" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                    {categoriesError}
-                  </div>
-                ) : categoryCards.length > 0 ? (
-                  categoryCards.map((category) => (
-                    <button
-                      key={category}
-                      onClick={() => toggleCategory(category)}
-                      className={`w-[400px] backdrop-blur-[20px] bg-[rgba(255,255,255,0.07)] rounded-[16px] px-3 py-6 flex items-center justify-between transition ${
-                        expandedCategories.has(category) || categoryType === categories.find(cat => getCategoryName(cat) === category)?.$id ? 'bg-[rgba(255,255,255,0.1)] border border-[#965cdf]' : ''
-                      }`}
-                    >
-                      <span
-                        className="text-white text-[14px] leading-[24px] whitespace-nowrap"
-                        style={{ fontFamily: 'Cinzel, serif', fontWeight: 550 }}
-                      >
-                        {category}
-                      </span>
-                      <div className="bg-[rgba(255,255,255,0.2)] rounded-full w-5 h-5 flex items-center justify-center shrink-0">
-                        <ChevronDownIcon
-                          width={20}
-                          height={20}
-                          color="#fff"
-                          className={`transition-transform ${
-                            expandedCategories.has(category) ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="text-[#8f8f8f] text-[14px] p-4" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                    No categories available
-                  </div>
-                )}
-              </div>
 
               {/* Main Content Audio Players */}
               {(mainContentSupportFile || mainContentRecoveryFile) && (
@@ -450,7 +385,7 @@ export const CreateTemptation = () => {
                   </div>
                   <Button
                     className="w-full h-[56px]"
-                    onClick={handleUploadButtonClick}
+                    onClick={() => handleUploadButtonClick()}
                   >
                     Upload More
                   </Button>
@@ -461,7 +396,7 @@ export const CreateTemptation = () => {
                     className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#965cdf] transition-colors"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, 'image')}
-                    onClick={handleUploadButtonClick}
+                    onClick={() => handleUploadButtonClick()}
                   >
                     <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
                       No image uploaded
@@ -469,7 +404,7 @@ export const CreateTemptation = () => {
                   </div>
                   <Button
                     className="w-full h-[56px]"
-                    onClick={handleUploadButtonClick}
+                    onClick={() => handleUploadButtonClick()}
                   >
                     Upload Files
                   </Button>
@@ -504,7 +439,7 @@ export const CreateTemptation = () => {
                             </div>
                             <button
                               onClick={() => setTranscriptSupportFile(null)}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
                               aria-label="Remove transcript"
                             >
                               <CloseIcon width={24} height={24} color="#8f8f8f" />
@@ -529,7 +464,7 @@ export const CreateTemptation = () => {
                             </div>
                             <button
                               onClick={() => setTranscriptRecoveryFile(null)}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
                               aria-label="Remove transcript"
                             >
                               <CloseIcon width={24} height={24} color="#8f8f8f" />
@@ -541,7 +476,11 @@ export const CreateTemptation = () => {
                     {(!transcriptSupportFile || !transcriptRecoveryFile) && (
                       <Button
                         className="w-full h-[56px]"
-                        onClick={handleUploadButtonClick}
+                        onClick={() =>
+                          handleUploadButtonClick(
+                            !transcriptSupportFile ? 'supportTranscript' : 'recoveryTranscript'
+                          )
+                        }
                       >
                         Upload {!transcriptSupportFile ? 'Support' : 'Recovery'} Transcript
                       </Button>
@@ -550,7 +489,7 @@ export const CreateTemptation = () => {
                 ) : (
                   <div
                     className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
-                    onClick={handleUploadButtonClick}
+                    onClick={() => handleUploadButtonClick()}
                   >
                     <CloudUploadIcon width={48} height={48} color="#fff" />
                     <div className="text-center">
@@ -605,12 +544,16 @@ export const CreateTemptation = () => {
       {/* File Upload Popup */}
       <FileUploadPopup
         isOpen={isUploadPopupOpen}
-        onClose={() => setIsUploadPopupOpen(false)}
+        onClose={() => {
+          setIsUploadPopupOpen(false);
+          setUploadPreferredContentType(null);
+        }}
         onUpload={handleUploadComplete}
         accept="*"
         title="Upload Files"
         supportedFormats="Images, Audio (MP3, WAV, M4A), Documents (PDF, DOC, DOCX)"
         contentTypes={contentTypeOptions}
+        preferredContentType={uploadPreferredContentType}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useId } from 'react';
 import PlayIcon from '../assets/icons/play';
 import PauseIcon from '../assets/icons/pause';
 import VolumeIcon from '../assets/icons/volume';
+import VolumeOffIcon from '../assets/icons/volume-off';
 import CloseIcon from '../assets/icons/close';
 import { audioManager } from '../lib/audioManager';
 
@@ -26,13 +27,15 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [_isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const timeUpdateIntervalRef = useRef<number | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const lastNonZeroVolumeRef = useRef<number>(1);
 
   // Create object URL when file changes, or use provided URL
   useEffect(() => {
@@ -144,6 +147,15 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       updateDuration();
     };
 
+    const handleVolumeChange = () => {
+      // Keep UI state synced with the actual <audio> element
+      const muted = audio.muted || audio.volume === 0;
+      setIsMuted(muted);
+      if (!muted && audio.volume > 0) {
+        lastNonZeroVolumeRef.current = audio.volume;
+      }
+    };
+
     // Set up event listeners
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -154,16 +166,20 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('error', handleError);
+    audio.addEventListener('volumechange', handleVolumeChange);
 
     // Ensure audio is loaded (React sets src via JSX)
     // Use requestAnimationFrame to ensure React has updated the DOM
     requestAnimationFrame(() => {
       if (audio && audioUrl) {
         // Double-check the src matches (React should have set it)
-        if (!audio.src || audio.getAttribute('src') !== audioUrl) {
+        const shouldReload = !audio.src || audio.getAttribute('src') !== audioUrl;
+        if (shouldReload) {
           audio.src = audioUrl;
+          audio.load();
         }
-        audio.load();
+        // Apply current mute state (must NOT reload audio)
+        audio.muted = isMuted;
       }
     });
 
@@ -178,6 +194,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('error', handleError);
+      audio.removeEventListener('volumechange', handleVolumeChange);
       
       if (timeUpdateIntervalRef.current !== null) {
         clearInterval(timeUpdateIntervalRef.current);
@@ -187,6 +204,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audioManager.unregister(playerId);
     };
   }, [audioUrl, playerId]);
+
+  // Apply mute state without reloading or seeking
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.muted = isMuted;
+  }, [isMuted]);
 
   // Sync playing state with actual audio state and manager
   useEffect(() => {
@@ -270,10 +294,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           await audio.play();
           setIsPlaying(true);
           setError(null);
-        } catch (playError: any) {
+        } catch (playError: unknown) {
           console.error('Play error:', playError);
           audioManager.pause(playerId);
-          if (playError.name === 'NotAllowedError') {
+          const name =
+            playError && typeof playError === 'object' && 'name' in playError
+              ? String((playError as { name?: unknown }).name)
+              : '';
+          if (name === 'NotAllowedError') {
             setError('Autoplay blocked. Please click play again.');
           } else {
             setError('Failed to play audio.');
@@ -281,7 +309,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           setIsPlaying(false);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error in togglePlay:', error);
       audioManager.pause(playerId);
       setError('Failed to play audio. Please try again.');
@@ -299,6 +327,28 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const displayTime = isSeeking ? seekTime : currentTime;
   const progress = duration > 0 ? (displayTime / duration) * 100 : 0;
+
+  const toggleMute = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const nextMuted = !(audio.muted || audio.volume === 0);
+    if (nextMuted) {
+      if (audio.volume > 0) {
+        lastNonZeroVolumeRef.current = audio.volume;
+      }
+      audio.muted = true;
+      setIsMuted(true);
+      return;
+    }
+
+    // Unmute
+    audio.muted = false;
+    if (audio.volume === 0) {
+      audio.volume = Math.max(0.1, Math.min(1, lastNonZeroVolumeRef.current || 1));
+    }
+    setIsMuted(false);
+  };
 
   const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const audio = audioRef.current;
@@ -379,11 +429,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         </p>
       )}
       <div className="flex gap-4 items-center w-full">
-        <div className="backdrop-blur-[20px] bg-[rgba(255,255,255,0.07)] rounded-[16px] px-4 py-2 flex flex-1 gap-4 items-center min-w-0">
+        <div className="backdrop-blur-[20px] bg-[rgba(255,255,255,0.07)] rounded-4 px-4 py-2 flex flex-1 gap-4 items-center min-w-0">
           <button
             onClick={togglePlay}
             disabled={!audioUrl || !!error}
-            className="shrink-0 w-8 h-8 flex items-center justify-center hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shrink-0 w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
@@ -393,9 +443,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             )}
           </button>
           <p
-            className="text-white text-[12px] leading-[16px] shrink-0 font-roboto font-normal"
+            className="text-white text-[12px] leading-4 shrink-0 font-roboto font-normal"
           >
-            {formatTime(displayTime)} / {formatTime(duration)}
+            {isLoading ? 'Loading…' : `${formatTime(displayTime)} / ${formatTime(duration)}`}
           </p>
           <div className="flex-1 min-w-0 relative py-2 -my-2">
             <div
@@ -430,14 +480,23 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
               />
             </div>
           </div>
-          <button className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition">
-            <VolumeIcon width={24} height={24} color="#fff" />
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? (
+              <VolumeOffIcon width={24} height={24} color="#fff" />
+            ) : (
+              <VolumeIcon width={24} height={24} color="#fff" />
+            )}
           </button>
         </div>
         {onRemove && (
           <button
             onClick={onRemove}
-            className="shrink-0 w-6 h-6 flex items-center justify-center hover:opacity-80 transition"
+            className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
             aria-label="Remove audio"
           >
             <CloseIcon width={24} height={24} color="#8f8f8f" />
