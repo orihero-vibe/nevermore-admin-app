@@ -473,18 +473,24 @@ export const CreateTemptation = () => {
                         </div>
                       )}
                     </div>
-                    {(!transcriptSupportFile || !transcriptRecoveryFile) && (
-                      <Button
-                        className="w-full h-[56px]"
-                        onClick={() =>
-                          handleUploadButtonClick(
-                            !transcriptSupportFile ? 'supportTranscript' : 'recoveryTranscript'
-                          )
-                        }
-                      >
-                        Upload {!transcriptSupportFile ? 'Support' : 'Recovery'} Transcript
-                      </Button>
-                    )}
+                    <Button
+                      className="w-full h-[56px]"
+                      onClick={() =>
+                        handleUploadButtonClick(
+                          !transcriptSupportFile
+                            ? 'supportTranscript'
+                            : !transcriptRecoveryFile
+                            ? 'recoveryTranscript'
+                            : null
+                        )
+                      }
+                    >
+                      {!transcriptSupportFile
+                        ? 'Upload Support Transcript'
+                        : !transcriptRecoveryFile
+                        ? 'Upload Recovery Transcript'
+                        : 'Upload Additional Files'}
+                    </Button>
                   </div>
                 ) : (
                   <div

@@ -840,22 +840,25 @@ export const TemptationDetails = () => {
                         </div>
                       )}
                     </div>
-                    {/* Show upload button if missing one or both transcripts */}
-                    {(!transcriptSupportFile && !transcriptSupportUrl) || (!transcriptRecoveryFile && !transcriptRecoveryUrl) ? (
-                      <Button
-                        className="w-full h-[56px]"
-                        onClick={() =>
-                          handleUploadButtonClick(
-                            !transcriptSupportFile && !transcriptSupportUrl
-                              ? 'supportTranscript'
-                              : 'recoveryTranscript'
-                          )
-                        }
-                        disabled={!isEditing}
-                      >
-                        Upload {!transcriptSupportFile && !transcriptSupportUrl ? 'Support' : 'Recovery'} Transcript
-                      </Button>
-                    ) : null}
+                    <Button
+                      className="w-full h-[56px]"
+                      onClick={() =>
+                        handleUploadButtonClick(
+                          !transcriptSupportFile && !transcriptSupportUrl
+                            ? 'supportTranscript'
+                            : !transcriptRecoveryFile && !transcriptRecoveryUrl
+                            ? 'recoveryTranscript'
+                            : null
+                        )
+                      }
+                      disabled={!isEditing}
+                    >
+                      {!transcriptSupportFile && !transcriptSupportUrl
+                        ? 'Upload Support Transcript'
+                        : !transcriptRecoveryFile && !transcriptRecoveryUrl
+                        ? 'Upload Recovery Transcript'
+                        : 'Upload Additional Files'}
+                    </Button>
                   </div>
                 ) : (
                   <div

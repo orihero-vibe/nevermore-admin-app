@@ -208,7 +208,7 @@ export const createPasswordRecovery = async (
     // Appwrite will append userId and secret as query parameters
     const recoveryUrl = url || `${window.location.origin}/create-new-password`;
     await account.createRecovery({
-      email,
+      email: email.trim().toLowerCase(),
       url: recoveryUrl,
     });
   } catch (error: unknown) {
