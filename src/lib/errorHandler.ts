@@ -81,3 +81,28 @@ export const isUnauthorizedError = (error: unknown): boolean => {
   return false;
 };
 
+/**
+ * Check if error is a forbidden (403) error
+ */
+export const isForbiddenError = (error: unknown): boolean => {
+  if (error && typeof error === 'object') {
+    const appwriteError = error as {
+      code?: number;
+      message?: string;
+      response?: { code?: number };
+    };
+
+    if (appwriteError.code === 403 || appwriteError.response?.code === 403) {
+      return true;
+    }
+
+    if (appwriteError.message) {
+      return (
+        appwriteError.message.includes('403') ||
+        appwriteError.message.includes('Forbidden')
+      );
+    }
+  }
+  return false;
+};
+

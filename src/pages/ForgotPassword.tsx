@@ -22,9 +22,10 @@ export const ForgotPassword = () => {
 
     setIsLoading(true);
     try {
-      await createPasswordRecovery(email);
-      // Navigate to link sent page with email in state
-      navigate('/link-sent', { state: { email } });
+      const normalizedEmail = email.trim().toLowerCase();
+      await createPasswordRecovery(normalizedEmail);
+      // Navigate to link sent page with email in state (normalized so resend matches the first request)
+      navigate('/link-sent', { state: { email: normalizedEmail } });
     } catch (error: unknown) {
       // Get error message directly from Appwrite error
       const errorMessage = error instanceof Error 

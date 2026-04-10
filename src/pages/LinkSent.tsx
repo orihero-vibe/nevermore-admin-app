@@ -26,7 +26,7 @@ export const LinkSent = () => {
     setIsResending(true);
 
     try {
-      await createPasswordRecovery(email);
+      await createPasswordRecovery(email.trim().toLowerCase());
       setResendSuccess(true);
       // Clear success message after 3 seconds
       setTimeout(() => {

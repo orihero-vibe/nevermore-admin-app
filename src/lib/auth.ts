@@ -3,10 +3,16 @@ import { Query } from "appwrite";
 import type { Models } from "appwrite";
 import type { User } from "../types";
 import { showAppwriteError } from "./notifications";
-import { isUnauthorizedError } from "./errorHandler";
+import { isForbiddenError, isUnauthorizedError } from "./errorHandler";
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID || '';
 const USER_PROFILES_COLLECTION_ID = import.meta.env.VITE_APPWRITE_USER_PROFILES_COLLECTION_ID || 'user_profiles';
+/** Attribute on `user_profiles` that stores the account email (for pre-recovery coach checks). */
+const USER_PROFILE_EMAIL_FIELD =
+  import.meta.env.VITE_USER_PROFILE_EMAIL_FIELD || 'email';
+
+const ADMIN_RECOVERY_EMAIL_NOT_ELIGIBLE_MESSAGE =
+  'No admin account was found for this email address.';
 
 interface UserProfile {
   $id: string;
@@ -197,24 +203,70 @@ export const signOut = async (): Promise<void> => {
 };
 
 /**
+ * When the project allows unauthenticated reads on `user_profiles` (or equivalent),
+ * ensure the email belongs to a coach before Appwrite sends a recovery message.
+ * If the lookup cannot run (e.g. 401), we skip this gate so recovery still works.
+ */
+const assertCoachEmailForAdminRecovery = async (
+  normalizedEmail: string
+): Promise<void> => {
+  if (!DATABASE_ID || !USER_PROFILES_COLLECTION_ID) {
+    return;
+  }
+
+  try {
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: USER_PROFILES_COLLECTION_ID,
+      queries: [
+        Query.equal(USER_PROFILE_EMAIL_FIELD, normalizedEmail),
+        Query.equal('type', 'coach'),
+        Query.limit(1),
+      ],
+    });
+
+    if (!response.rows?.length) {
+      throw new Error(ADMIN_RECOVERY_EMAIL_NOT_ELIGIBLE_MESSAGE);
+    }
+  } catch (error: unknown) {
+    if (
+      error instanceof Error &&
+      error.message === ADMIN_RECOVERY_EMAIL_NOT_ELIGIBLE_MESSAGE
+    ) {
+      throw error;
+    }
+    if (isUnauthorizedError(error) || isForbiddenError(error)) {
+      return;
+    }
+    console.warn('Coach email check skipped (could not verify):', error);
+  }
+};
+
+/**
  * Create password recovery (sends recovery email)
  */
 export const createPasswordRecovery = async (
   email: string,
   url?: string
 ): Promise<void> => {
+  const normalizedEmail = email.trim().toLowerCase();
+
   try {
+    await assertCoachEmailForAdminRecovery(normalizedEmail);
     // If no URL is provided, construct the default recovery URL
     // Appwrite will append userId and secret as query parameters
     const recoveryUrl = url || `${window.location.origin}/create-new-password`;
     await account.createRecovery({
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       url: recoveryUrl,
     });
   } catch (error: unknown) {
-    // Show notification for recovery errors
-    showAppwriteError(error, { skipUnauthorized: true });
-    // Just throw the error as-is
+    const isEligibilityError =
+      error instanceof Error &&
+      error.message === ADMIN_RECOVERY_EMAIL_NOT_ELIGIBLE_MESSAGE;
+    if (!isEligibilityError) {
+      showAppwriteError(error, { skipUnauthorized: true });
+    }
     throw error;
   }
 };
