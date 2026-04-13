@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
-import CloudUploadIcon from '../assets/icons/cloud-upload';
-import CloseIcon from '../assets/icons/close';
 import { Select } from '../components/Select';
 import type { SelectOption } from '../components/Select';
 import { Button } from '../components/Button';
@@ -16,8 +14,6 @@ import { useCategoriesStore } from '../store/categoriesStore';
 
 // Content type options for file upload
 const contentTypeOptions: SelectOption[] = [
-  { value: 'supportTranscript', label: 'Support Transcript' },
-  { value: 'recoveryTranscript', label: 'Recovery Transcript' },
   { value: 'image', label: 'Image' },
   { value: 'mainContentSupport', label: 'Main Content (Support)' },
   { value: 'mainContentRecovery', label: 'Main Content (Recovery)' },
@@ -40,8 +36,8 @@ export const CreateTemptation = () => {
   const [questionAudioFiles, setQuestionAudioFiles] = useState<File[]>([]);
   const [mainContentSupportFile, setMainContentSupportFile] = useState<File | null>(null);
   const [mainContentRecoveryFile, setMainContentRecoveryFile] = useState<File | null>(null);
-  const [transcriptSupportFile, setTranscriptSupportFile] = useState<File | null>(null);
-  const [transcriptRecoveryFile, setTranscriptRecoveryFile] = useState<File | null>(null);
+  const [transcriptSupportText, setTranscriptSupportText] = useState('');
+  const [transcriptRecoveryText, setTranscriptRecoveryText] = useState('');
 
   // Fetch categories on mount (only once, centrally managed)
   useEffect(() => {
@@ -122,12 +118,6 @@ export const CreateTemptation = () => {
         case 'mainContentRecovery':
           setMainContentRecoveryFile(uploadFile.file);
           break;
-        case 'supportTranscript':
-          setTranscriptSupportFile(uploadFile.file);
-          break;
-        case 'recoveryTranscript':
-          setTranscriptRecoveryFile(uploadFile.file);
-          break;
       }
     });
 
@@ -167,13 +157,13 @@ export const CreateTemptation = () => {
       return;
     }
 
-    if (!transcriptSupportFile) {
-      showAppwriteError(new Error('Support Transcript is required'));
+    if (!transcriptSupportText.trim()) {
+      showAppwriteError(new Error('Support transcript text is required'));
       return;
     }
 
-    if (!transcriptRecoveryFile) {
-      showAppwriteError(new Error('Recovery Transcript is required'));
+    if (!transcriptRecoveryText.trim()) {
+      showAppwriteError(new Error('Recovery transcript text is required'));
       return;
     }
 
@@ -193,8 +183,6 @@ export const CreateTemptation = () => {
         questionFiles: questionAudioFiles,
         mainContentSupportFile,
         mainContentRecoveryFile,
-        transcriptSupportFile,
-        transcriptRecoveryFile,
       };
       
       await publishContent(
@@ -202,6 +190,8 @@ export const CreateTemptation = () => {
           title: contentTitle.trim(),
           category: categoryType,
           type: 'forty_temptations',
+          transcriptSupportText: transcriptSupportText.trim(),
+          transcriptRecoveryText: transcriptRecoveryText.trim(),
         },
         [], // Legacy imageFiles
         [], // Legacy audioFiles
@@ -411,110 +401,42 @@ export const CreateTemptation = () => {
                 </>
               )}
 
-              {/* Transcript Upload Section */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-4">
                 <label
                   className="text-white text-[16px] leading-[24px]"
                   style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
                 >
-                  Transcripts:
+                  Transcripts (in-app)
                 </label>
-                {(transcriptSupportFile || transcriptRecoveryFile) ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                      {transcriptSupportFile && (
-                        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-4 flex flex-col gap-3 items-start">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex flex-col gap-1 flex-1 min-w-0">
-                              <span className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                                Support Transcript
-                              </span>
-                              <p
-                                className="text-white text-[16px] leading-[24px] truncate"
-                                style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
-                                title={transcriptSupportFile.name}
-                              >
-                                {transcriptSupportFile.name}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => setTranscriptSupportFile(null)}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
-                              aria-label="Remove transcript"
-                            >
-                              <CloseIcon width={24} height={24} color="#8f8f8f" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {transcriptRecoveryFile && (
-                        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-4 flex flex-col gap-3 items-start">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex flex-col gap-1 flex-1 min-w-0">
-                              <span className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                                Recovery Transcript
-                              </span>
-                              <p
-                                className="text-white text-[16px] leading-[24px] truncate"
-                                style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
-                                title={transcriptRecoveryFile.name}
-                              >
-                                {transcriptRecoveryFile.name}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => setTranscriptRecoveryFile(null)}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
-                              aria-label="Remove transcript"
-                            >
-                              <CloseIcon width={24} height={24} color="#8f8f8f" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      className="w-full h-[56px]"
-                      onClick={() =>
-                        handleUploadButtonClick(
-                          !transcriptSupportFile
-                            ? 'supportTranscript'
-                            : !transcriptRecoveryFile
-                            ? 'recoveryTranscript'
-                            : null
-                        )
-                      }
-                    >
-                      {!transcriptSupportFile
-                        ? 'Upload Support Transcript'
-                        : !transcriptRecoveryFile
-                        ? 'Upload Recovery Transcript'
-                        : 'Upload Additional Files'}
-                    </Button>
-                  </div>
-                ) : (
-                  <div
-                    className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
-                    onClick={() => handleUploadButtonClick()}
-                  >
-                    <CloudUploadIcon width={48} height={48} color="#fff" />
-                    <div className="text-center">
-                      <p
-                        className="text-white text-[16px] leading-[24px] mb-1"
-                        style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
-                      >
-                        Drag & drop files or{' '}
-                        <span className="text-[#965cdf]">Browse</span>
-                      </p>
-                      <p
-                        className="text-[#8f8f8f] text-[12px] leading-[16px]"
-                        style={{ fontFamily: 'Roboto, sans-serif' }}
-                      >
-                        Support Transcript & Recovery Transcript
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <p className="text-[#8f8f8f] text-[12px] leading-[16px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                  Paste full transcript text for each role.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                    Support transcript
+                  </label>
+                  <textarea
+                    value={transcriptSupportText}
+                    onChange={(e) => setTranscriptSupportText(e.target.value)}
+                    rows={8}
+                    placeholder="Paste Support transcript…"
+                    className="w-full rounded-[12px] bg-[#131313] border border-[rgba(255,255,255,0.25)] text-white text-[14px] leading-[22px] p-3 placeholder-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf] resize-y min-h-[120px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                    Recovery transcript
+                  </label>
+                  <textarea
+                    value={transcriptRecoveryText}
+                    onChange={(e) => setTranscriptRecoveryText(e.target.value)}
+                    rows={8}
+                    placeholder="Paste Recovery transcript…"
+                    className="w-full rounded-[12px] bg-[#131313] border border-[rgba(255,255,255,0.25)] text-white text-[14px] leading-[22px] p-3 placeholder-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf] resize-y min-h-[120px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  />
+                </div>
               </div>
             </div>
           </div>

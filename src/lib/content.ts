@@ -19,8 +19,8 @@ export interface ContentData {
   // New fields for 40 Temptations
   mainContentRecoveryURL?: string; // Single URL for Main Content (Recovery) audio
   mainContentSupportURL?: string; // Single URL for Main Content (Support) audio
-  transcriptRecoveryURL?: string; // Single URL for Recovery Transcript
-  transcriptSupportURL?: string; // Single URL for Support Transcript
+  transcriptRecoveryText?: string; // In-app Recovery transcript (plain text)
+  transcriptSupportText?: string; // In-app Support transcript (plain text)
 }
 
 export interface UploadedFile {
@@ -201,12 +201,24 @@ export async function createContent(contentData: ContentData): Promise<string> {
       documentData.mainContentSupportURL = contentData.mainContentSupportURL;
     }
 
-    if (contentData.transcriptRecoveryURL) {
-      documentData.transcriptRecoveryURL = contentData.transcriptRecoveryURL;
+    if (contentData.transcriptRecoveryText !== undefined) {
+      const t =
+        typeof contentData.transcriptRecoveryText === 'string'
+          ? contentData.transcriptRecoveryText.trim()
+          : '';
+      if (t.length > 0) {
+        documentData.transcriptRecoveryText = t;
+      }
     }
 
-    if (contentData.transcriptSupportURL) {
-      documentData.transcriptSupportURL = contentData.transcriptSupportURL;
+    if (contentData.transcriptSupportText !== undefined) {
+      const t =
+        typeof contentData.transcriptSupportText === 'string'
+          ? contentData.transcriptSupportText.trim()
+          : '';
+      if (t.length > 0) {
+        documentData.transcriptSupportText = t;
+      }
     }
 
     // Create the row
@@ -232,8 +244,6 @@ export async function createContent(contentData: ContentData): Promise<string> {
 export interface TemptationFiles {
   mainContentRecoveryFile?: File | null;
   mainContentSupportFile?: File | null;
-  transcriptRecoveryFile?: File | null;
-  transcriptSupportFile?: File | null;
   questionFiles?: File[];
   imageFiles?: File[];
 }
@@ -261,8 +271,6 @@ export async function publishContent(
       if (temptationFiles.questionFiles && temptationFiles.questionFiles.length > 0) totalSteps++;
       if (temptationFiles.mainContentRecoveryFile) totalSteps++;
       if (temptationFiles.mainContentSupportFile) totalSteps++;
-      if (temptationFiles.transcriptRecoveryFile) totalSteps++;
-      if (temptationFiles.transcriptSupportFile) totalSteps++;
     } else {
       // Legacy file handling
       if (imageFiles.length > 0) totalSteps++;
@@ -280,8 +288,6 @@ export async function publishContent(
     let transcriptUrls: string[] = [];
     let mainContentRecoveryURL: string | undefined;
     let mainContentSupportURL: string | undefined;
-    let transcriptRecoveryURL: string | undefined;
-    let transcriptSupportURL: string | undefined;
 
     // Handle 40 Temptations file structure
     if (temptationFiles) {
@@ -321,23 +327,6 @@ export async function publishContent(
         onProgress?.(Math.round((currentStep / totalSteps) * 100));
       }
 
-      // Upload Recovery Transcript
-      if (temptationFiles.transcriptRecoveryFile) {
-        onProgress?.(Math.round((currentStep / totalSteps) * 100));
-        const uploaded = await uploadFile(temptationFiles.transcriptRecoveryFile);
-        transcriptRecoveryURL = uploaded.url;
-        currentStep++;
-        onProgress?.(Math.round((currentStep / totalSteps) * 100));
-      }
-
-      // Upload Support Transcript
-      if (temptationFiles.transcriptSupportFile) {
-        onProgress?.(Math.round((currentStep / totalSteps) * 100));
-        const uploaded = await uploadFile(temptationFiles.transcriptSupportFile);
-        transcriptSupportURL = uploaded.url;
-        currentStep++;
-        onProgress?.(Math.round((currentStep / totalSteps) * 100));
-      }
     } else {
       // Legacy file handling for backward compatibility
       // Upload images
@@ -388,8 +377,6 @@ export async function publishContent(
       tasks: tasks && tasks.length > 0 ? tasks : undefined,
       mainContentRecoveryURL,
       mainContentSupportURL,
-      transcriptRecoveryURL,
-      transcriptSupportURL,
     });
     currentStep++;
     onProgress?.(100);
@@ -419,8 +406,8 @@ export interface ContentDocument {
   // New fields for 40 Temptations
   mainContentRecoveryURL?: string;
   mainContentSupportURL?: string;
-  transcriptRecoveryURL?: string;
-  transcriptSupportURL?: string;
+  transcriptRecoveryText?: string;
+  transcriptSupportText?: string;
   $createdAt?: string;
   $updatedAt?: string;
   [key: string]: unknown;
@@ -500,16 +487,20 @@ export async function updateContent(
       documentData.mainContentSupportURL = null;
     }
 
-    if (contentData.transcriptRecoveryURL) {
-      documentData.transcriptRecoveryURL = contentData.transcriptRecoveryURL;
-    } else {
-      documentData.transcriptRecoveryURL = null;
+    if (contentData.transcriptRecoveryText !== undefined) {
+      const t =
+        typeof contentData.transcriptRecoveryText === 'string'
+          ? contentData.transcriptRecoveryText.trim()
+          : '';
+      documentData.transcriptRecoveryText = t.length > 0 ? t : null;
     }
 
-    if (contentData.transcriptSupportURL) {
-      documentData.transcriptSupportURL = contentData.transcriptSupportURL;
-    } else {
-      documentData.transcriptSupportURL = null;
+    if (contentData.transcriptSupportText !== undefined) {
+      const t =
+        typeof contentData.transcriptSupportText === 'string'
+          ? contentData.transcriptSupportText.trim()
+          : '';
+      documentData.transcriptSupportText = t.length > 0 ? t : null;
     }
 
     // Update the row
@@ -619,8 +610,6 @@ export interface ExistingTemptationUrls {
   questionUrls?: string[];
   mainContentSupportURL?: string | null;
   mainContentRecoveryURL?: string | null;
-  transcriptSupportURL?: string | null;
-  transcriptRecoveryURL?: string | null;
 }
 
 /**
@@ -640,9 +629,6 @@ export async function updateTemptationContent(
     if (temptationFiles.questionFiles && temptationFiles.questionFiles.length > 0) totalSteps++;
     if (temptationFiles.mainContentSupportFile) totalSteps++;
     if (temptationFiles.mainContentRecoveryFile) totalSteps++;
-    if (temptationFiles.transcriptSupportFile) totalSteps++;
-    if (temptationFiles.transcriptRecoveryFile) totalSteps++;
-
     let currentStep = 0;
 
     // Variables for URLs
@@ -650,8 +636,6 @@ export async function updateTemptationContent(
     let newQuestionUrls: string[] = [];
     let mainContentSupportURL: string | undefined;
     let mainContentRecoveryURL: string | undefined;
-    let transcriptSupportURL: string | undefined;
-    let transcriptRecoveryURL: string | undefined;
 
     // Upload new images
     if (temptationFiles.imageFiles && temptationFiles.imageFiles.length > 0) {
@@ -689,24 +673,6 @@ export async function updateTemptationContent(
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
     }
 
-    // Upload Support Transcript
-    if (temptationFiles.transcriptSupportFile) {
-      onProgress?.(Math.round((currentStep / totalSteps) * 100));
-      const uploaded = await uploadFile(temptationFiles.transcriptSupportFile);
-      transcriptSupportURL = uploaded.url;
-      currentStep++;
-      onProgress?.(Math.round((currentStep / totalSteps) * 100));
-    }
-
-    // Upload Recovery Transcript
-    if (temptationFiles.transcriptRecoveryFile) {
-      onProgress?.(Math.round((currentStep / totalSteps) * 100));
-      const uploaded = await uploadFile(temptationFiles.transcriptRecoveryFile);
-      transcriptRecoveryURL = uploaded.url;
-      currentStep++;
-      onProgress?.(Math.round((currentStep / totalSteps) * 100));
-    }
-
     // Combine existing URLs with new ones
     const allImageUrls = [...(existingUrls.imageUrls || []), ...newImageUrls];
     const allQuestionUrls = [...(existingUrls.questionUrls || []), ...newQuestionUrls];
@@ -714,8 +680,6 @@ export async function updateTemptationContent(
     // Use new URL if uploaded, otherwise keep existing
     const finalMainContentSupportURL = mainContentSupportURL || existingUrls.mainContentSupportURL || undefined;
     const finalMainContentRecoveryURL = mainContentRecoveryURL || existingUrls.mainContentRecoveryURL || undefined;
-    const finalTranscriptSupportURL = transcriptSupportURL || existingUrls.transcriptSupportURL || undefined;
-    const finalTranscriptRecoveryURL = transcriptRecoveryURL || existingUrls.transcriptRecoveryURL || undefined;
 
     // Update content document
     onProgress?.(Math.round((currentStep / totalSteps) * 100));
@@ -725,8 +689,6 @@ export async function updateTemptationContent(
       files: allQuestionUrls.length > 0 ? allQuestionUrls : undefined,
       mainContentSupportURL: finalMainContentSupportURL,
       mainContentRecoveryURL: finalMainContentRecoveryURL,
-      transcriptSupportURL: finalTranscriptSupportURL,
-      transcriptRecoveryURL: finalTranscriptRecoveryURL,
     });
     currentStep++;
     onProgress?.(100);
@@ -763,9 +725,6 @@ export async function deleteContent(contentId: string): Promise<void> {
     if (content.transcripts) fileUrls.push(...content.transcripts);
     if (content.mainContentRecoveryURL) fileUrls.push(content.mainContentRecoveryURL);
     if (content.mainContentSupportURL) fileUrls.push(content.mainContentSupportURL);
-    if (content.transcriptRecoveryURL) fileUrls.push(content.transcriptRecoveryURL);
-    if (content.transcriptSupportURL) fileUrls.push(content.transcriptSupportURL);
-
     // Delete all files from storage
     for (const url of fileUrls) {
       const fileInfo = extractFileInfoFromUrl(url);

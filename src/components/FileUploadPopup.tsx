@@ -123,7 +123,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
       }
     }
 
-    // Check for document/transcript files
+    // Check for document files (map to transcript only if those types exist in this popup)
     if (
       fileType.includes('pdf') ||
       fileType.includes('document') ||
@@ -133,13 +133,14 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
       fileType.includes('powerpoint') ||
       fileName.match(/\.(pdf|doc|docx|txt|psd|ai|ppt|pptx|rtf|odt)$/i)
     ) {
-      // For new content types, default to 'supportTranscript' for documents
       if (contentTypes.some(ct => ct.value === 'supportTranscript')) {
         return 'supportTranscript';
       }
-      // Legacy fallback
       if (contentTypes.some(ct => ct.value === 'transcript')) {
         return 'transcript';
+      }
+      if (contentTypes.some(ct => ct.value === 'question')) {
+        return 'question';
       }
     }
 
@@ -154,17 +155,17 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
     'transcript', // Legacy
   ];
 
-  // Transcript types that share a limit of 2 total
-  const transcriptTypes = ['supportTranscript', 'recoveryTranscript'];
+  const transcriptTypes = ['supportTranscript', 'recoveryTranscript'].filter((t) =>
+    contentTypes.some((ct) => ct.value === t)
+  );
 
   const addFiles = (files: File[]) => {
     // Create UploadFile objects with auto-detected content types
     const newFiles: UploadFile[] = [];
     let discardedCount = 0;
 
-    // Count existing transcript files
-    const existingTranscriptCount = uploadFiles.filter(
-      (uf) => transcriptTypes.includes(uf.contentType)
+    const existingTranscriptCount = uploadFiles.filter((uf) =>
+      transcriptTypes.includes(uf.contentType)
     ).length;
 
     let newTranscriptCount = 0;
@@ -254,7 +255,9 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
     // Show warning if files were discarded
     if (discardedCount > 0) {
       showWarning(
-        `${discardedCount} file(s) discarded. Only one file per type is allowed for main content, and max 2 transcripts.`
+        `${discardedCount} file(s) discarded. Only one file per type is allowed for main content${
+          transcriptTypes.length > 0 ? ', and max 2 transcript files when transcript types are enabled.' : '.'
+        }`
       );
     }
 

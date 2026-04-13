@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
-import CloudUploadIcon from '../assets/icons/cloud-upload';
-import CloseIcon from '../assets/icons/close';
 import { Select } from '../components/Select';
 import type { SelectOption } from '../components/Select';
 import { Button } from '../components/Button';
@@ -10,7 +8,7 @@ import { AudioPlayer } from '../components/AudioPlayer';
 import { FileUploadPopup, type UploadFile } from '../components/FileUploadPopup';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { categoriesToSelectOptions, getCategoryName } from '../lib/categories';
-import { updateTemptationContent, fetchContentById, getFileNameFromUrl, deleteContent, type ContentDocument, type TemptationFiles, type ExistingTemptationUrls } from '../lib/content';
+import { updateTemptationContent, fetchContentById, deleteContent, type ContentDocument, type TemptationFiles, type ExistingTemptationUrls } from '../lib/content';
 import { showAppwriteError } from '../lib/notifications';
 import DeleteIcon from '@/assets/icons/delete';
 import { useCategoriesStore } from '../store/categoriesStore';
@@ -18,8 +16,6 @@ import { useCategoriesStore } from '../store/categoriesStore';
 
 // Content type options for file upload (matching CreateTemptation)
 const contentTypeOptions: SelectOption[] = [
-  { value: 'supportTranscript', label: 'Support Transcript' },
-  { value: 'recoveryTranscript', label: 'Recovery Transcript' },
   { value: 'image', label: 'Image' },
   { value: 'mainContentSupport', label: 'Main Content (Support)' },
   { value: 'mainContentRecovery', label: 'Main Content (Recovery)' },
@@ -56,12 +52,8 @@ export const TemptationDetails = () => {
   const [mainContentSupportUrl, setMainContentSupportUrl] = useState<string | null>(null);
   const [mainContentRecoveryFile, setMainContentRecoveryFile] = useState<File | null>(null);
   const [mainContentRecoveryUrl, setMainContentRecoveryUrl] = useState<string | null>(null);
-  const [transcriptSupportFile, setTranscriptSupportFile] = useState<File | null>(null);
-  const [transcriptSupportUrl, setTranscriptSupportUrl] = useState<string | null>(null);
-  const [transcriptSupportFileName, setTranscriptSupportFileName] = useState<string | null>(null);
-  const [transcriptRecoveryFile, setTranscriptRecoveryFile] = useState<File | null>(null);
-  const [transcriptRecoveryUrl, setTranscriptRecoveryUrl] = useState<string | null>(null);
-  const [transcriptRecoveryFileName, setTranscriptRecoveryFileName] = useState<string | null>(null);
+  const [transcriptSupportText, setTranscriptSupportText] = useState('');
+  const [transcriptRecoveryText, setTranscriptRecoveryText] = useState('');
   
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -116,23 +108,12 @@ export const TemptationDetails = () => {
               setMainContentRecoveryUrl(contentDoc.mainContentRecoveryURL);
             }
             
-            // Load Support Transcript URL and fetch file name
-            if (contentDoc.transcriptSupportURL) {
-              setTranscriptSupportUrl(contentDoc.transcriptSupportURL);
-              // Fetch file name from Appwrite Storage
-              getFileNameFromUrl(contentDoc.transcriptSupportURL).then((name) => {
-                if (name) setTranscriptSupportFileName(name);
-              });
-            }
-            
-            // Load Recovery Transcript URL and fetch file name
-            if (contentDoc.transcriptRecoveryURL) {
-              setTranscriptRecoveryUrl(contentDoc.transcriptRecoveryURL);
-              // Fetch file name from Appwrite Storage
-              getFileNameFromUrl(contentDoc.transcriptRecoveryURL).then((name) => {
-                if (name) setTranscriptRecoveryFileName(name);
-              });
-            }
+            setTranscriptSupportText(
+              typeof contentDoc.transcriptSupportText === 'string' ? contentDoc.transcriptSupportText : ''
+            );
+            setTranscriptRecoveryText(
+              typeof contentDoc.transcriptRecoveryText === 'string' ? contentDoc.transcriptRecoveryText : ''
+            );
           }
         } catch (error) {
           console.error('Error loading content data:', error);
@@ -213,9 +194,6 @@ export const TemptationDetails = () => {
     const newQuestionAudioUploaded = questionAudioFiles.length > 0;
     const newMainContentSupportUploaded = mainContentSupportFile !== null;
     const newMainContentRecoveryUploaded = mainContentRecoveryFile !== null;
-    const newTranscriptSupportUploaded = transcriptSupportFile !== null;
-    const newTranscriptRecoveryUploaded = transcriptRecoveryFile !== null;
-    
     // Check if existing files were removed (compare existing image count with original)
     const originalImageCount = originalContentData?.images?.length || 0;
     const currentExistingImageCount = uploadedImages.filter(img => img.url && !img.file).length;
@@ -223,15 +201,16 @@ export const TemptationDetails = () => {
     const questionAudioRemoved = originalContentData?.files && originalContentData.files.length > 0 && questionAudioFiles.length === 0 && questionAudioUrls.length === 0;
     const mainContentSupportRemoved = originalContentData?.mainContentSupportURL && !mainContentSupportFile && !mainContentSupportUrl;
     const mainContentRecoveryRemoved = originalContentData?.mainContentRecoveryURL && !mainContentRecoveryFile && !mainContentRecoveryUrl;
-    const transcriptSupportRemoved = originalContentData?.transcriptSupportURL && !transcriptSupportFile && !transcriptSupportUrl;
-    const transcriptRecoveryRemoved = originalContentData?.transcriptRecoveryURL && !transcriptRecoveryFile && !transcriptRecoveryUrl;
-    
+    const originalSupportText = (originalContentData?.transcriptSupportText as string | undefined) || '';
+    const originalRecoveryText = (originalContentData?.transcriptRecoveryText as string | undefined) || '';
+    const transcriptSupportChanged = transcriptSupportText !== originalSupportText;
+    const transcriptRecoveryChanged = transcriptRecoveryText !== originalRecoveryText;
+
     const filesChanged = newImagesUploaded || newQuestionAudioUploaded || 
       newMainContentSupportUploaded || newMainContentRecoveryUploaded || 
-      newTranscriptSupportUploaded || newTranscriptRecoveryUploaded ||
       imagesRemoved || questionAudioRemoved || 
       mainContentSupportRemoved || mainContentRecoveryRemoved ||
-      transcriptSupportRemoved || transcriptRecoveryRemoved;
+      transcriptSupportChanged || transcriptRecoveryChanged;
     
     return titleChanged || categoryChanged || filesChanged;
   };
@@ -277,15 +256,13 @@ export const TemptationDetails = () => {
       return;
     }
 
-    // Check for Support Transcript (new file or existing URL)
-    if (!transcriptSupportFile && !transcriptSupportUrl) {
-      showAppwriteError(new Error('Support Transcript is required'));
+    if (!transcriptSupportText.trim()) {
+      showAppwriteError(new Error('Support transcript text is required'));
       return;
     }
 
-    // Check for Recovery Transcript (new file or existing URL)
-    if (!transcriptRecoveryFile && !transcriptRecoveryUrl) {
-      showAppwriteError(new Error('Recovery Transcript is required'));
+    if (!transcriptRecoveryText.trim()) {
+      showAppwriteError(new Error('Recovery transcript text is required'));
       return;
     }
 
@@ -312,8 +289,6 @@ export const TemptationDetails = () => {
         questionFiles: questionAudioFiles,
         mainContentSupportFile: mainContentSupportFile,
         mainContentRecoveryFile: mainContentRecoveryFile,
-        transcriptSupportFile: transcriptSupportFile,
-        transcriptRecoveryFile: transcriptRecoveryFile,
       };
       
       // Prepare existing URLs
@@ -322,8 +297,6 @@ export const TemptationDetails = () => {
         questionUrls: questionAudioUrls,
         mainContentSupportURL: mainContentSupportUrl,
         mainContentRecoveryURL: mainContentRecoveryUrl,
-        transcriptSupportURL: transcriptSupportUrl,
-        transcriptRecoveryURL: transcriptRecoveryUrl,
       };
       
       // Update content (uploads new files and updates content document, preserving existing URLs)
@@ -333,6 +306,8 @@ export const TemptationDetails = () => {
           title: contentTitle,
           category: categoryType,
           type: 'forty_temptations',
+          transcriptSupportText: transcriptSupportText.trim(),
+          transcriptRecoveryText: transcriptRecoveryText.trim(),
         },
         temptationFiles,
         existingUrls,
@@ -369,24 +344,12 @@ export const TemptationDetails = () => {
         setMainContentSupportUrl(updatedContent.mainContentSupportURL || null);
         setMainContentRecoveryUrl(updatedContent.mainContentRecoveryURL || null);
         
-        // Reload Transcript URLs and fetch file names
-        setTranscriptSupportUrl(updatedContent.transcriptSupportURL || null);
-        if (updatedContent.transcriptSupportURL) {
-          getFileNameFromUrl(updatedContent.transcriptSupportURL).then((name) => {
-            if (name) setTranscriptSupportFileName(name);
-          });
-        } else {
-          setTranscriptSupportFileName(null);
-        }
-        
-        setTranscriptRecoveryUrl(updatedContent.transcriptRecoveryURL || null);
-        if (updatedContent.transcriptRecoveryURL) {
-          getFileNameFromUrl(updatedContent.transcriptRecoveryURL).then((name) => {
-            if (name) setTranscriptRecoveryFileName(name);
-          });
-        } else {
-          setTranscriptRecoveryFileName(null);
-        }
+        setTranscriptSupportText(
+          typeof updatedContent.transcriptSupportText === 'string' ? updatedContent.transcriptSupportText : ''
+        );
+        setTranscriptRecoveryText(
+          typeof updatedContent.transcriptRecoveryText === 'string' ? updatedContent.transcriptRecoveryText : ''
+        );
       }
 
       // Update original values after successful save
@@ -397,9 +360,6 @@ export const TemptationDetails = () => {
       setQuestionAudioFiles([]);
       setMainContentSupportFile(null);
       setMainContentRecoveryFile(null);
-      setTranscriptSupportFile(null);
-      setTranscriptRecoveryFile(null);
-      
       // Navigate back to content management after successful save
       navigate('/content-management');
     } catch (error) {
@@ -468,16 +428,6 @@ export const TemptationDetails = () => {
           break;
         case 'mainContentRecovery':
           setMainContentRecoveryFile(uploadFile.file);
-          break;
-        case 'supportTranscript':
-          setTranscriptSupportFile(uploadFile.file);
-          setTranscriptSupportFileName(uploadFile.file.name);
-          setTranscriptSupportUrl(null); // Clear existing URL when new file is uploaded
-          break;
-        case 'recoveryTranscript':
-          setTranscriptRecoveryFile(uploadFile.file);
-          setTranscriptRecoveryFileName(uploadFile.file.name);
-          setTranscriptRecoveryUrl(null); // Clear existing URL when new file is uploaded
           break;
       }
     });
@@ -766,123 +716,45 @@ export const TemptationDetails = () => {
                 )}
               </div>
 
-              {/* Transcript Upload Section */}
-              <div className="flex flex-col gap-2">
+              {/* In-app transcripts (plain text, shown in mobile app) */}
+              <div className="flex flex-col gap-4">
                 <label
                   className="text-white text-[16px] leading-[24px]"
                   style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
                 >
-                  Transcripts:
+                  Transcripts (in-app)
                 </label>
-                {(transcriptSupportFile || transcriptSupportUrl || transcriptRecoveryFile || transcriptRecoveryUrl) ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                      {/* Support Transcript */}
-                      {(transcriptSupportFile || transcriptSupportUrl) && (
-                        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-4 flex flex-col gap-3 items-start">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex flex-col gap-1 flex-1 min-w-0">
-                              <span className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                                Support Transcript
-                              </span>
-                              <p
-                                className="text-white text-[16px] leading-[24px] truncate"
-                                style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
-                                title={transcriptSupportFile?.name || transcriptSupportFileName || (transcriptSupportUrl ? 'Loading...' : 'No file')}
-                              >
-                                {transcriptSupportFile?.name || transcriptSupportFileName || (transcriptSupportUrl ? 'Loading...' : 'No file')}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                setTranscriptSupportFile(null);
-                                setTranscriptSupportUrl(null);
-                                setTranscriptSupportFileName(null);
-                              }}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
-                              aria-label="Remove transcript"
-                              disabled={!isEditing}
-                            >
-                              <CloseIcon width={24} height={24} color="#8f8f8f" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {/* Recovery Transcript */}
-                      {(transcriptRecoveryFile || transcriptRecoveryUrl) && (
-                        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] pt-4 px-4 pb-4 flex flex-col gap-3 items-start">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex flex-col gap-1 flex-1 min-w-0">
-                              <span className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                                Recovery Transcript
-                              </span>
-                              <p
-                                className="text-white text-[16px] leading-[24px] truncate"
-                                style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
-                                title={transcriptRecoveryFile?.name || transcriptRecoveryFileName || (transcriptRecoveryUrl ? 'Loading...' : 'No file')}
-                              >
-                                {transcriptRecoveryFile?.name || transcriptRecoveryFileName || (transcriptRecoveryUrl ? 'Loading...' : 'No file')}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                setTranscriptRecoveryFile(null);
-                                setTranscriptRecoveryUrl(null);
-                                setTranscriptRecoveryFileName(null);
-                              }}
-                              className="shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition"
-                              aria-label="Remove transcript"
-                              disabled={!isEditing}
-                            >
-                              <CloseIcon width={24} height={24} color="#8f8f8f" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      className="w-full h-[56px]"
-                      onClick={() =>
-                        handleUploadButtonClick(
-                          !transcriptSupportFile && !transcriptSupportUrl
-                            ? 'supportTranscript'
-                            : !transcriptRecoveryFile && !transcriptRecoveryUrl
-                            ? 'recoveryTranscript'
-                            : null
-                        )
-                      }
-                      disabled={!isEditing}
-                    >
-                      {!transcriptSupportFile && !transcriptSupportUrl
-                        ? 'Upload Support Transcript'
-                        : !transcriptRecoveryFile && !transcriptRecoveryUrl
-                        ? 'Upload Recovery Transcript'
-                        : 'Upload Additional Files'}
-                    </Button>
-                  </div>
-                ) : (
-                  <div
-                    className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
-                    onClick={isEditing ? () => handleUploadButtonClick() : undefined}
-                  >
-                    <CloudUploadIcon width={48} height={48} color="#fff" />
-                    <div className="text-center">
-                      <p
-                        className="text-white text-[16px] leading-[24px] mb-1"
-                        style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
-                      >
-                        Drag & drop files or{' '}
-                        <span className="text-[#965cdf]">Browse</span>
-                      </p>
-                      <p
-                        className="text-[#8f8f8f] text-[12px] leading-[16px]"
-                        style={{ fontFamily: 'Roboto, sans-serif' }}
-                      >
-                        Support Transcript & Recovery Transcript
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <p className="text-[#8f8f8f] text-[12px] leading-[16px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                  Paste full transcript text for each role. This replaces file-based transcripts.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                    Support transcript
+                  </label>
+                  <textarea
+                    value={transcriptSupportText}
+                    onChange={(e) => setTranscriptSupportText(e.target.value)}
+                    disabled={!isEditing}
+                    rows={8}
+                    placeholder="Paste Support transcript…"
+                    className="w-full rounded-[12px] bg-[#131313] border border-[rgba(255,255,255,0.25)] text-white text-[14px] leading-[22px] p-3 placeholder-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf] disabled:opacity-60 resize-y min-h-[120px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[#965cdf] text-[12px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                    Recovery transcript
+                  </label>
+                  <textarea
+                    value={transcriptRecoveryText}
+                    onChange={(e) => setTranscriptRecoveryText(e.target.value)}
+                    disabled={!isEditing}
+                    rows={8}
+                    placeholder="Paste Recovery transcript…"
+                    className="w-full rounded-[12px] bg-[#131313] border border-[rgba(255,255,255,0.25)] text-white text-[14px] leading-[22px] p-3 placeholder-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf] disabled:opacity-60 resize-y min-h-[120px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  />
+                </div>
               </div>
             </div>
           </div>
