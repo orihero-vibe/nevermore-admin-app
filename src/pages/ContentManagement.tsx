@@ -51,7 +51,10 @@ function mapContentToItem(
     category: categoryName,
     type: typeDisplay,
     tasks: doc.tasks,
-    hasAudio: doc.files && doc.files.length > 0,
+    hasAudio:
+      (doc.files && doc.files.length > 0) ||
+      (doc.recoveryQuestionFiles && doc.recoveryQuestionFiles.length > 0) ||
+      (doc.supportQuestionFiles && doc.supportQuestionFiles.length > 0),
     day: doc.day,
   };
 }
@@ -191,8 +194,22 @@ export const ContentManagement = () => {
     })),
   ], [categories]);
 
+  const formatJourneyListTitle = (row: ContentItem): string => {
+    if (row.type !== '40 Day Journey' || row.day == null || !Number.isFinite(row.day)) {
+      return row.title;
+    }
+    const raw = row.title?.trim() ?? '';
+    return raw === '' || raw.toLowerCase() === 'day'
+      ? `Day ${row.day}`
+      : `${raw} (Day ${row.day})`;
+  };
+
   const columns: Column<ContentItem>[] = [
-    { key: 'title', label: 'Title' },
+    {
+      key: 'title',
+      label: 'Title',
+      render: (_value, row) => formatJourneyListTitle(row),
+    },
     { key: 'category', label: 'Category' },
     { key: 'type', label: 'Type' },
   ];

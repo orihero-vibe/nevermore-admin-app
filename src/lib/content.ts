@@ -1,6 +1,11 @@
 import { storage, tablesDB } from './appwrite';
 import { Query, ID } from 'appwrite';
 import { showAppwriteError, showSuccess } from './notifications';
+import {
+  fileExceedsMaxUpload,
+  formatFileSize,
+  getConfiguredMaxUploadBytes,
+} from './uploadLimits';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID || '';
 const CONTENT_COLLECTION_ID = import.meta.env.VITE_APPWRITE_CONTENT_COLLECTION_ID || 'content';
@@ -11,7 +16,9 @@ export interface ContentData {
   category?: string; // Category ID (relationship - Many to one)
   type: string; // Enum: required field
   images?: string[]; // Array of URLs
-  files?: string[]; // Array of URLs (for question audio files)
+  files?: string[];
+  recoveryQuestionFiles?: string[];
+  supportQuestionFiles?: string[];
   transcript?: string; // Single URL (deprecated, use transcripts)
   transcripts?: string[]; // Array of URLs (for multiple transcript files)
   tasks?: string[]; // Array of strings (for 40 Day Journey)
@@ -21,6 +28,8 @@ export interface ContentData {
   mainContentSupportURL?: string; // Single URL for Main Content (Support) audio
   transcriptRecoveryText?: string; // In-app Recovery transcript (plain text)
   transcriptSupportText?: string; // In-app Support transcript (plain text)
+  recoveryImages?: string[]; // Array of URLs for Recovery images
+  supportImages?: string[]; // Array of URLs for Support images
 }
 
 export interface UploadedFile {
@@ -76,6 +85,15 @@ export async function uploadFile(
     throw new Error(
       'VITE_APPWRITE_STORAGE_BUCKET_ID is not set in environment variables. Please add it to your .env file.'
     );
+  }
+
+  const maxBytes = getConfiguredMaxUploadBytes();
+  if (fileExceedsMaxUpload(file, maxBytes)) {
+    const err = new Error(
+      `"${file.name}" is ${formatFileSize(file.size)}. The maximum size per file is ${formatFileSize(maxBytes)}. Use a smaller file or ask your administrator to raise the limit.`
+    );
+    showAppwriteError(err);
+    throw err;
   }
 
   try {
@@ -221,6 +239,22 @@ export async function createContent(contentData: ContentData): Promise<string> {
       }
     }
 
+    if (contentData.recoveryImages && contentData.recoveryImages.length > 0) {
+      documentData.recoveryImages = contentData.recoveryImages;
+    }
+
+    if (contentData.supportImages && contentData.supportImages.length > 0) {
+      documentData.supportImages = contentData.supportImages;
+    }
+
+    if (contentData.recoveryQuestionFiles && contentData.recoveryQuestionFiles.length > 0) {
+      documentData.recoveryQuestionFiles = contentData.recoveryQuestionFiles;
+    }
+
+    if (contentData.supportQuestionFiles && contentData.supportQuestionFiles.length > 0) {
+      documentData.supportQuestionFiles = contentData.supportQuestionFiles;
+    }
+
     // Create the row
     const response = await tablesDB.createRow({
       databaseId: DATABASE_ID,
@@ -244,8 +278,10 @@ export async function createContent(contentData: ContentData): Promise<string> {
 export interface TemptationFiles {
   mainContentRecoveryFile?: File | null;
   mainContentSupportFile?: File | null;
-  questionFiles?: File[];
-  imageFiles?: File[];
+  questionRecoveryFiles?: File[];
+  questionSupportFiles?: File[];
+  recoveryImageFiles?: File[];
+  supportImageFiles?: File[];
 }
 
 /**
@@ -267,10 +303,12 @@ export async function publishContent(
     
     // For 40 Temptations with new file structure
     if (temptationFiles) {
-      if (temptationFiles.imageFiles && temptationFiles.imageFiles.length > 0) totalSteps++;
-      if (temptationFiles.questionFiles && temptationFiles.questionFiles.length > 0) totalSteps++;
+      if (temptationFiles.questionRecoveryFiles && temptationFiles.questionRecoveryFiles.length > 0) totalSteps++;
+      if (temptationFiles.questionSupportFiles && temptationFiles.questionSupportFiles.length > 0) totalSteps++;
       if (temptationFiles.mainContentRecoveryFile) totalSteps++;
       if (temptationFiles.mainContentSupportFile) totalSteps++;
+      if (temptationFiles.recoveryImageFiles && temptationFiles.recoveryImageFiles.length > 0) totalSteps++;
+      if (temptationFiles.supportImageFiles && temptationFiles.supportImageFiles.length > 0) totalSteps++;
     } else {
       // Legacy file handling
       if (imageFiles.length > 0) totalSteps++;
@@ -288,26 +326,33 @@ export async function publishContent(
     let transcriptUrls: string[] = [];
     let mainContentRecoveryURL: string | undefined;
     let mainContentSupportURL: string | undefined;
+    let recoveryImageUrls: string[] = [];
+    let supportImageUrls: string[] = [];
+    let recoveryQuestionUrls: string[] = [];
+    let supportQuestionUrls: string[] = [];
 
     // Handle 40 Temptations file structure
     if (temptationFiles) {
-      // Upload images
-      if (temptationFiles.imageFiles && temptationFiles.imageFiles.length > 0) {
+
+      // Upload Recovery question audio files
+      if (temptationFiles.questionRecoveryFiles && temptationFiles.questionRecoveryFiles.length > 0) {
         onProgress?.(Math.round((currentStep / totalSteps) * 100));
-        const uploadedImages = await uploadFiles(temptationFiles.imageFiles);
-        imageUrls = uploadedImages.map((file) => file.url);
+        const uploadedAudio = await uploadFiles(temptationFiles.questionRecoveryFiles);
+        recoveryQuestionUrls = uploadedAudio.map((file) => file.url);
         currentStep++;
         onProgress?.(Math.round((currentStep / totalSteps) * 100));
       }
 
-      // Upload question audio files
-      if (temptationFiles.questionFiles && temptationFiles.questionFiles.length > 0) {
+      // Upload Support question audio files
+      if (temptationFiles.questionSupportFiles && temptationFiles.questionSupportFiles.length > 0) {
         onProgress?.(Math.round((currentStep / totalSteps) * 100));
-        const uploadedAudio = await uploadFiles(temptationFiles.questionFiles);
-        audioUrls = uploadedAudio.map((file) => file.url);
+        const uploadedAudio = await uploadFiles(temptationFiles.questionSupportFiles);
+        supportQuestionUrls = uploadedAudio.map((file) => file.url);
         currentStep++;
         onProgress?.(Math.round((currentStep / totalSteps) * 100));
       }
+
+      audioUrls = [...recoveryQuestionUrls, ...supportQuestionUrls];
 
       // Upload Main Content (Recovery)
       if (temptationFiles.mainContentRecoveryFile) {
@@ -323,6 +368,24 @@ export async function publishContent(
         onProgress?.(Math.round((currentStep / totalSteps) * 100));
         const uploaded = await uploadFile(temptationFiles.mainContentSupportFile);
         mainContentSupportURL = uploaded.url;
+        currentStep++;
+        onProgress?.(Math.round((currentStep / totalSteps) * 100));
+      }
+
+      // Upload Recovery images
+      if (temptationFiles.recoveryImageFiles && temptationFiles.recoveryImageFiles.length > 0) {
+        onProgress?.(Math.round((currentStep / totalSteps) * 100));
+        const uploadedRecoveryImages = await uploadFiles(temptationFiles.recoveryImageFiles);
+        recoveryImageUrls = uploadedRecoveryImages.map((file) => file.url);
+        currentStep++;
+        onProgress?.(Math.round((currentStep / totalSteps) * 100));
+      }
+
+      // Upload Support images
+      if (temptationFiles.supportImageFiles && temptationFiles.supportImageFiles.length > 0) {
+        onProgress?.(Math.round((currentStep / totalSteps) * 100));
+        const uploadedSupportImages = await uploadFiles(temptationFiles.supportImageFiles);
+        supportImageUrls = uploadedSupportImages.map((file) => file.url);
         currentStep++;
         onProgress?.(Math.round((currentStep / totalSteps) * 100));
       }
@@ -377,6 +440,12 @@ export async function publishContent(
       tasks: tasks && tasks.length > 0 ? tasks : undefined,
       mainContentRecoveryURL,
       mainContentSupportURL,
+      recoveryImages: recoveryImageUrls.length > 0 ? recoveryImageUrls : undefined,
+      supportImages: supportImageUrls.length > 0 ? supportImageUrls : undefined,
+      recoveryQuestionFiles:
+        recoveryQuestionUrls.length > 0 ? recoveryQuestionUrls : undefined,
+      supportQuestionFiles:
+        supportQuestionUrls.length > 0 ? supportQuestionUrls : undefined,
     });
     currentStep++;
     onProgress?.(100);
@@ -398,7 +467,9 @@ export interface ContentDocument {
   category?: string; // Category ID (relationship)
   type: string; // Enum: forty_day_journey, forty_temptations
   images?: string[];
-  files?: string[]; // Question audio files URLs
+  files?: string[]; // Legacy combined question audio URLs
+  recoveryQuestionFiles?: string[];
+  supportQuestionFiles?: string[];
   transcript?: string; // Single URL (deprecated, use transcripts)
   transcripts?: string[]; // Array of URLs (for multiple transcript files)
   tasks?: string[];
@@ -408,6 +479,8 @@ export interface ContentDocument {
   mainContentSupportURL?: string;
   transcriptRecoveryText?: string;
   transcriptSupportText?: string;
+  recoveryImages?: string[];
+  supportImages?: string[];
   $createdAt?: string;
   $updatedAt?: string;
   [key: string]: unknown;
@@ -503,6 +576,30 @@ export async function updateContent(
       documentData.transcriptSupportText = t.length > 0 ? t : null;
     }
 
+    if (contentData.recoveryImages) {
+      documentData.recoveryImages = contentData.recoveryImages;
+    } else {
+      documentData.recoveryImages = null;
+    }
+
+    if (contentData.supportImages) {
+      documentData.supportImages = contentData.supportImages;
+    } else {
+      documentData.supportImages = null;
+    }
+
+    if (contentData.recoveryQuestionFiles) {
+      documentData.recoveryQuestionFiles = contentData.recoveryQuestionFiles;
+    } else {
+      documentData.recoveryQuestionFiles = null;
+    }
+
+    if (contentData.supportQuestionFiles) {
+      documentData.supportQuestionFiles = contentData.supportQuestionFiles;
+    } else {
+      documentData.supportQuestionFiles = null;
+    }
+
     // Update the row
     const response = await tablesDB.updateRow({
       databaseId: DATABASE_ID,
@@ -531,7 +628,7 @@ export async function updateContentWithFiles(
   transcriptFile: File | null,
   tasks?: string[],
   onProgress?: (progress: number) => void,
-  existingImageUrls?: string[],
+  _existingImageUrls?: string[],
   existingAudioUrls?: string[],
   existingTranscriptUrl?: string | null
 ): Promise<string> {
@@ -544,17 +641,15 @@ export async function updateContentWithFiles(
     let currentStep = 0;
 
     // Upload new images
-    let newImageUrls: string[] = [];
+    let _newImageUrls: string[] = [];
     if (imageFiles.length > 0) {
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
       const uploadedImages = await uploadFiles(imageFiles);
-      newImageUrls = uploadedImages.map((file) => file.url);
+      _newImageUrls = uploadedImages.map((file) => file.url);
       currentStep++;
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
     }
 
-    // Combine existing image URLs with new ones
-    const allImageUrls = [...(existingImageUrls || []), ...newImageUrls];
 
     // Upload new audio files
     let newAudioUrls: string[] = [];
@@ -586,7 +681,7 @@ export async function updateContentWithFiles(
     onProgress?.(Math.round((currentStep / totalSteps) * 100));
     await updateContent(contentId, {
       ...contentData,
-      images: allImageUrls.length > 0 ? allImageUrls : undefined,
+      images: _newImageUrls.length > 0 ? _newImageUrls : undefined,
       files: allAudioUrls.length > 0 ? allAudioUrls : undefined, // Store audio files in 'files' array
       transcript: finalTranscriptUrl,
       tasks: tasks && tasks.length > 0 ? tasks : undefined,
@@ -606,10 +701,12 @@ export async function updateContentWithFiles(
  * Existing URLs for temptation content update
  */
 export interface ExistingTemptationUrls {
-  imageUrls?: string[];
-  questionUrls?: string[];
+  questionRecoveryUrls?: string[];
+  questionSupportUrls?: string[];
   mainContentSupportURL?: string | null;
   mainContentRecoveryURL?: string | null;
+  recoveryImageUrls?: string[];
+  supportImageUrls?: string[];
 }
 
 /**
@@ -625,32 +722,37 @@ export async function updateTemptationContent(
   try {
     // Calculate total steps
     let totalSteps = 1; // +1 for updating content
-    if (temptationFiles.imageFiles && temptationFiles.imageFiles.length > 0) totalSteps++;
-    if (temptationFiles.questionFiles && temptationFiles.questionFiles.length > 0) totalSteps++;
+    if (temptationFiles.questionRecoveryFiles && temptationFiles.questionRecoveryFiles.length > 0) totalSteps++;
+    if (temptationFiles.questionSupportFiles && temptationFiles.questionSupportFiles.length > 0) totalSteps++;
     if (temptationFiles.mainContentSupportFile) totalSteps++;
     if (temptationFiles.mainContentRecoveryFile) totalSteps++;
+    if (temptationFiles.recoveryImageFiles && temptationFiles.recoveryImageFiles.length > 0) totalSteps++;
+    if (temptationFiles.supportImageFiles && temptationFiles.supportImageFiles.length > 0) totalSteps++;
     let currentStep = 0;
 
     // Variables for URLs
-    let newImageUrls: string[] = [];
-    let newQuestionUrls: string[] = [];
+    let newQuestionRecoveryUrls: string[] = [];
+    let newQuestionSupportUrls: string[] = [];
     let mainContentSupportURL: string | undefined;
     let mainContentRecoveryURL: string | undefined;
+    let newRecoveryImageUrls: string[] = [];
+    let newSupportImageUrls: string[] = [];
 
-    // Upload new images
-    if (temptationFiles.imageFiles && temptationFiles.imageFiles.length > 0) {
+
+    // Upload new Recovery question audio files
+    if (temptationFiles.questionRecoveryFiles && temptationFiles.questionRecoveryFiles.length > 0) {
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
-      const uploadedImages = await uploadFiles(temptationFiles.imageFiles);
-      newImageUrls = uploadedImages.map((file) => file.url);
+      const uploadedQuestions = await uploadFiles(temptationFiles.questionRecoveryFiles);
+      newQuestionRecoveryUrls = uploadedQuestions.map((file) => file.url);
       currentStep++;
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
     }
 
-    // Upload new question audio files
-    if (temptationFiles.questionFiles && temptationFiles.questionFiles.length > 0) {
+    // Upload new Support question audio files
+    if (temptationFiles.questionSupportFiles && temptationFiles.questionSupportFiles.length > 0) {
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
-      const uploadedQuestions = await uploadFiles(temptationFiles.questionFiles);
-      newQuestionUrls = uploadedQuestions.map((file) => file.url);
+      const uploadedQuestions = await uploadFiles(temptationFiles.questionSupportFiles);
+      newQuestionSupportUrls = uploadedQuestions.map((file) => file.url);
       currentStep++;
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
     }
@@ -673,9 +775,36 @@ export async function updateTemptationContent(
       onProgress?.(Math.round((currentStep / totalSteps) * 100));
     }
 
+    // Upload Recovery images
+    if (temptationFiles.recoveryImageFiles && temptationFiles.recoveryImageFiles.length > 0) {
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+      const uploadedRecoveryImages = await uploadFiles(temptationFiles.recoveryImageFiles);
+      newRecoveryImageUrls = uploadedRecoveryImages.map((file) => file.url);
+      currentStep++;
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+    }
+
+    // Upload Support images
+    if (temptationFiles.supportImageFiles && temptationFiles.supportImageFiles.length > 0) {
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+      const uploadedSupportImages = await uploadFiles(temptationFiles.supportImageFiles);
+      newSupportImageUrls = uploadedSupportImages.map((file) => file.url);
+      currentStep++;
+      onProgress?.(Math.round((currentStep / totalSteps) * 100));
+    }
+
     // Combine existing URLs with new ones
-    const allImageUrls = [...(existingUrls.imageUrls || []), ...newImageUrls];
-    const allQuestionUrls = [...(existingUrls.questionUrls || []), ...newQuestionUrls];
+    const allQuestionRecoveryUrls = [
+      ...(existingUrls.questionRecoveryUrls || []),
+      ...newQuestionRecoveryUrls,
+    ];
+    const allQuestionSupportUrls = [
+      ...(existingUrls.questionSupportUrls || []),
+      ...newQuestionSupportUrls,
+    ];
+    const allQuestionUrlsCombined = [...allQuestionRecoveryUrls, ...allQuestionSupportUrls];
+    const allRecoveryImageUrls = [...(existingUrls.recoveryImageUrls || []), ...newRecoveryImageUrls];
+    const allSupportImageUrls = [...(existingUrls.supportImageUrls || []), ...newSupportImageUrls];
 
     // Use new URL if uploaded, otherwise keep existing
     const finalMainContentSupportURL = mainContentSupportURL || existingUrls.mainContentSupportURL || undefined;
@@ -685,10 +814,16 @@ export async function updateTemptationContent(
     onProgress?.(Math.round((currentStep / totalSteps) * 100));
     await updateContent(contentId, {
       ...contentData,
-      images: allImageUrls.length > 0 ? allImageUrls : undefined,
-      files: allQuestionUrls.length > 0 ? allQuestionUrls : undefined,
+      images: undefined, // No general images for temptations
+      files: allQuestionUrlsCombined.length > 0 ? allQuestionUrlsCombined : undefined,
+      recoveryQuestionFiles:
+        allQuestionRecoveryUrls.length > 0 ? allQuestionRecoveryUrls : undefined,
+      supportQuestionFiles:
+        allQuestionSupportUrls.length > 0 ? allQuestionSupportUrls : undefined,
       mainContentSupportURL: finalMainContentSupportURL,
       mainContentRecoveryURL: finalMainContentRecoveryURL,
+      recoveryImages: allRecoveryImageUrls.length > 0 ? allRecoveryImageUrls : undefined,
+      supportImages: allSupportImageUrls.length > 0 ? allSupportImageUrls : undefined,
     });
     currentStep++;
     onProgress?.(100);
@@ -725,8 +860,14 @@ export async function deleteContent(contentId: string): Promise<void> {
     if (content.transcripts) fileUrls.push(...content.transcripts);
     if (content.mainContentRecoveryURL) fileUrls.push(content.mainContentRecoveryURL);
     if (content.mainContentSupportURL) fileUrls.push(content.mainContentSupportURL);
+    if (content.recoveryImages) fileUrls.push(...content.recoveryImages);
+    if (content.supportImages) fileUrls.push(...content.supportImages);
+    if (content.recoveryQuestionFiles) fileUrls.push(...content.recoveryQuestionFiles);
+    if (content.supportQuestionFiles) fileUrls.push(...content.supportQuestionFiles);
+
+    const uniqueFileUrls = [...new Set(fileUrls)];
     // Delete all files from storage
-    for (const url of fileUrls) {
+    for (const url of uniqueFileUrls) {
       const fileInfo = extractFileInfoFromUrl(url);
       if (fileInfo) {
         try {
@@ -867,6 +1008,57 @@ export async function fetchContent(
   } catch (error) {
     console.error('Error fetching content:', error);
     showAppwriteError(error);
+    throw error;
+  }
+}
+
+/**
+ * Returns another 40-day journey document that already uses this day number, if any.
+ * Pass excludeContentId when editing so the current document is not treated as a conflict.
+ */
+export async function fetchFortyDayJourneyByDay(
+  dayNumber: number,
+  excludeContentId?: string,
+  options?: { silent?: boolean }
+): Promise<ContentDocument | null> {
+  if (!DATABASE_ID) {
+    const error = new Error(
+      'VITE_APPWRITE_DATABASE_ID is not set in environment variables. Please add it to your .env file.'
+    );
+    console.error('Configuration Error:', error.message);
+    throw error;
+  }
+
+  if (!CONTENT_COLLECTION_ID) {
+    const error = new Error(
+      'VITE_APPWRITE_CONTENT_COLLECTION_ID is not set in environment variables. Please add it to your .env file.'
+    );
+    console.error('Configuration Error:', error.message);
+    throw error;
+  }
+
+  try {
+    const queries: string[] = [
+      Query.equal('type', 'forty_day_journey'),
+      Query.equal('day', dayNumber),
+      Query.limit(25),
+    ];
+
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: CONTENT_COLLECTION_ID,
+      queries,
+    });
+
+    const rows = (response.rows as unknown as ContentDocument[]).filter(
+      (row) => row.$id !== excludeContentId
+    );
+    return rows.length > 0 ? rows[0] : null;
+  } catch (error) {
+    console.error('Error fetching journey by day:', error);
+    if (!options?.silent) {
+      showAppwriteError(error);
+    }
     throw error;
   }
 }

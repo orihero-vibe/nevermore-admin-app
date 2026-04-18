@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { AudioPlayer } from '../components/AudioPlayer';
@@ -7,7 +7,14 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
 import PlusIcon from '../assets/icons/plus';
 import CloseIcon from '../assets/icons/close';
-import { deleteContent, publishContent, updateContentWithFiles, fetchContentById, type ContentDocument } from '../lib/content';
+import {
+  deleteContent,
+  publishContent,
+  updateContentWithFiles,
+  fetchContentById,
+  fetchFortyDayJourneyByDay,
+  type ContentDocument,
+} from '../lib/content';
 import { showAppwriteError } from '../lib/notifications';
 
 interface JourneyData {
@@ -43,6 +50,68 @@ export const Journey40Day = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [dayError, setDayError] = useState<string | null>(null);
+  const [dayValidationPending, setDayValidationPending] = useState(false);
+
+  const dayBlocksSubmit = useMemo(() => {
+    if (day === '') return false;
+    return !!dayError || dayValidationPending;
+  }, [day, dayError, dayValidationPending]);
+
+  // Real-time day validation (range + duplicate check)
+  useEffect(() => {
+    if (isEditMode && !isEditing) {
+      setDayError(null);
+      setDayValidationPending(false);
+      return;
+    }
+
+    if (day === '') {
+      setDayError(null);
+      setDayValidationPending(false);
+      return;
+    }
+
+    const dayNum = Number(day);
+    if (!Number.isInteger(dayNum) || dayNum < 1 || dayNum > 40) {
+      setDayError('Day must be a whole number between 1 and 40');
+      setDayValidationPending(false);
+      return;
+    }
+
+    setDayValidationPending(true);
+    let cancelled = false;
+
+    const timer = window.setTimeout(() => {
+      (async () => {
+        try {
+          const existing = await fetchFortyDayJourneyByDay(dayNum, contentId, { silent: true });
+          if (cancelled) return;
+          if (existing) {
+            setDayError(
+              `Day ${dayNum} is already used by "${existing.title?.trim() || 'Untitled'}". Choose a different day.`
+            );
+          } else {
+            setDayError(null);
+          }
+        } catch {
+          if (!cancelled) {
+            setDayError('Could not verify this day. Try again.');
+          }
+        } finally {
+          if (!cancelled) {
+            setDayValidationPending(false);
+          }
+        }
+      })();
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      setDayValidationPending(false);
+    };
+  }, [day, contentId, isEditMode, isEditing]);
 
   // Load data when component mounts or journeyData changes
   useEffect(() => {
@@ -179,6 +248,10 @@ export const Journey40Day = () => {
       return;
     }
 
+    if (dayBlocksSubmit) {
+      return;
+    }
+
     // Filter out empty tasks
     const validTasks = tasks.filter((task) => task.trim().length > 0);
 
@@ -260,6 +333,10 @@ export const Journey40Day = () => {
     // Warn if no tasks are provided (but allow publishing)
     if (validTasks.length === 0) {
       console.warn('No tasks provided for the journey');
+    }
+
+    if (dayBlocksSubmit) {
+      return;
     }
 
     setIsPublishing(true);
@@ -352,7 +429,8 @@ export const Journey40Day = () => {
               disabled={
                 isSaving ||
                 !contentId ||
-                (isEditing && !hasUnsavedChanges())
+                (isEditing && !hasUnsavedChanges()) ||
+                (isEditing && dayBlocksSubmit)
               }
             >
               {isSaving ? `Saving... ${saveProgress}%` : isEditing ? 'Save' : 'Edit'}
@@ -428,8 +506,26 @@ export const Journey40Day = () => {
                 min="1"
                 max="40"
                 disabled={isEditMode ? !isEditing : false}
-                className="h-[56px] bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf]"
+                aria-invalid={!!dayError}
+                aria-describedby={dayError || dayValidationPending ? 'day-field-feedback' : undefined}
+                className={`h-[56px] bg-[#131313] border rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 ${
+                  dayError
+                    ? 'border-red-400 focus:ring-red-400/60'
+                    : 'border-[rgba(255,255,255,0.25)] focus:ring-[#965cdf]'
+                }`}
               />
+              <div id="day-field-feedback" className="min-h-[20px]">
+                {dayValidationPending && (
+                  <p className="text-[13px] leading-[20px] text-[#c4b5fd] font-roboto">
+                    Checking day…
+                  </p>
+                )}
+                {dayError && !dayValidationPending && (
+                  <p className="text-[13px] leading-[20px] text-red-400 font-roboto" role="alert">
+                    {dayError}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Audio Players */}
@@ -554,7 +650,7 @@ export const Journey40Day = () => {
             <Button
               onClick={handlePublish}
               className="w-[120px] h-[56px] rounded-[12px]"
-              disabled={isPublishing}
+              disabled={isPublishing || dayBlocksSubmit}
             >
               {isPublishing ? `Publishing... ${publishProgress}%` : 'Publish'}
             </Button>

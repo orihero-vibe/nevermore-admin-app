@@ -14,10 +14,12 @@ import { useCategoriesStore } from '../store/categoriesStore';
 
 // Content type options for file upload
 const contentTypeOptions: SelectOption[] = [
-  { value: 'image', label: 'Image' },
   { value: 'mainContentSupport', label: 'Main Content (Support)' },
   { value: 'mainContentRecovery', label: 'Main Content (Recovery)' },
-  { value: 'question', label: 'Question' },
+  { value: 'questionRecovery', label: 'Question (Recovery)' },
+  { value: 'questionSupport', label: 'Question (Support)' },
+  { value: 'recoveryImage', label: 'Recovery Image' },
+  { value: 'supportImage', label: 'Support Image' },
 ];
 
 export const CreateTemptation = () => {
@@ -32,12 +34,14 @@ export const CreateTemptation = () => {
   const [uploadPreferredContentType, setUploadPreferredContentType] = useState<string | null>(null);
   
   // New file state based on content types
-  const [uploadedImages, setUploadedImages] = useState<Array<{ id: string; src: string; file: File }>>([]);
-  const [questionAudioFiles, setQuestionAudioFiles] = useState<File[]>([]);
+  const [questionRecoveryFiles, setQuestionRecoveryFiles] = useState<File[]>([]);
+  const [questionSupportFiles, setQuestionSupportFiles] = useState<File[]>([]);
   const [mainContentSupportFile, setMainContentSupportFile] = useState<File | null>(null);
   const [mainContentRecoveryFile, setMainContentRecoveryFile] = useState<File | null>(null);
   const [transcriptSupportText, setTranscriptSupportText] = useState('');
   const [transcriptRecoveryText, setTranscriptRecoveryText] = useState('');
+  const [recoveryImages, setRecoveryImages] = useState<Array<{ id: string; src: string; file: File }>>([]);
+  const [supportImages, setSupportImages] = useState<Array<{ id: string; src: string; file: File }>>([]);
 
   // Fetch categories on mount (only once, centrally managed)
   useEffect(() => {
@@ -51,33 +55,7 @@ export const CreateTemptation = () => {
     navigate('/content-management');
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
 
-  const handleDrop = (e: React.DragEvent, type: 'image') => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0 && type === 'image') {
-      files.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setUploadedImages((prev) => [
-            ...prev,
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              src: reader.result as string,
-              file,
-            },
-          ]);
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-  };
 
   const handleUploadButtonClick = (preferredContentType?: string | null) => {
     setUploadPreferredContentType(preferredContentType ?? null);
@@ -87,23 +65,11 @@ export const CreateTemptation = () => {
   const handleUploadComplete = (uploadFiles: UploadFile[]) => {
     uploadFiles.forEach((uploadFile) => {
       switch (uploadFile.contentType) {
-        case 'image': {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setUploadedImages((prev) => [
-              ...prev,
-              {
-                id: `${Date.now()}-${Math.random()}`,
-                src: reader.result as string,
-                file: uploadFile.file,
-              },
-            ]);
-          };
-          reader.readAsDataURL(uploadFile.file);
+        case 'questionRecovery':
+          setQuestionRecoveryFiles((prev) => [...prev, uploadFile.file]);
           break;
-        }
-        case 'question':
-          setQuestionAudioFiles((prev) => [...prev, uploadFile.file]);
+        case 'questionSupport':
+          setQuestionSupportFiles((prev) => [...prev, uploadFile.file]);
           break;
         case 'mainContentSupport': {
           setMainContentSupportFile(uploadFile.file);
@@ -118,6 +84,36 @@ export const CreateTemptation = () => {
         case 'mainContentRecovery':
           setMainContentRecoveryFile(uploadFile.file);
           break;
+        case 'recoveryImage': {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setRecoveryImages((prev) => [
+              ...prev,
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                src: reader.result as string,
+                file: uploadFile.file,
+              },
+            ]);
+          };
+          reader.readAsDataURL(uploadFile.file);
+          break;
+        }
+        case 'supportImage': {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setSupportImages((prev) => [
+              ...prev,
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                src: reader.result as string,
+                file: uploadFile.file,
+              },
+            ]);
+          };
+          reader.readAsDataURL(uploadFile.file);
+          break;
+        }
       }
     });
 
@@ -126,9 +122,6 @@ export const CreateTemptation = () => {
   };
 
 
-  const handleRemoveImage = (imageId: string) => {
-    setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
-  };
 
   const handlePublish = async () => {
     // Validation
@@ -142,10 +135,6 @@ export const CreateTemptation = () => {
       return;
     }
 
-    if (uploadedImages.length === 0) {
-      showAppwriteError(new Error('Please upload at least one image'));
-      return;
-    }
 
     if (!mainContentSupportFile) {
       showAppwriteError(new Error('Main Content (Support) is required'));
@@ -167,8 +156,13 @@ export const CreateTemptation = () => {
       return;
     }
 
-    if (questionAudioFiles.length === 0) {
-      showAppwriteError(new Error('Please upload at least one Question audio file'));
+    if (questionRecoveryFiles.length === 0) {
+      showAppwriteError(new Error('Please upload at least one Recovery question audio file'));
+      return;
+    }
+
+    if (questionSupportFiles.length === 0) {
+      showAppwriteError(new Error('Please upload at least one Support question audio file'));
       return;
     }
 
@@ -176,13 +170,13 @@ export const CreateTemptation = () => {
     setPublishProgress(0);
 
     try {
-      const imageFiles = uploadedImages.map((img) => img.file);
-      
       const temptationFiles: TemptationFiles = {
-        imageFiles,
-        questionFiles: questionAudioFiles,
+        questionRecoveryFiles,
+        questionSupportFiles,
         mainContentSupportFile,
         mainContentRecoveryFile,
+        recoveryImageFiles: recoveryImages.map(img => img.file),
+        supportImageFiles: supportImages.map(img => img.file),
       };
       
       await publishContent(
@@ -307,16 +301,48 @@ export const CreateTemptation = () => {
                 </div>
               )}
 
-              {/* Question Audio Players */}
-              {questionAudioFiles.length > 0 && (
+              {/* Recovery question audio */}
+              {questionRecoveryFiles.length > 0 && (
                 <div className="flex flex-col gap-4">
-                  {questionAudioFiles.map((file, index) => (
+                  <p
+                    className="text-[#965cdf] text-[12px] leading-[16px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  >
+                    Recovery questions
+                  </p>
+                  {questionRecoveryFiles.map((file, index) => (
                     <AudioPlayer
-                      key={`question-${file.name}-${index}`}
-                      label={`Question ${index + 1}`}
+                      key={`question-recovery-${file.name}-${index}`}
+                      label={`Recovery question ${index + 1}`}
                       file={file}
                       onRemove={() => {
-                        setQuestionAudioFiles((prev) => {
+                        setQuestionRecoveryFiles((prev) => {
+                          const newFiles = [...prev];
+                          newFiles.splice(index, 1);
+                          return newFiles;
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Support question audio */}
+              {questionSupportFiles.length > 0 && (
+                <div className="flex flex-col gap-4">
+                  <p
+                    className="text-[#965cdf] text-[12px] leading-[16px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  >
+                    Support questions
+                  </p>
+                  {questionSupportFiles.map((file, index) => (
+                    <AudioPlayer
+                      key={`question-support-${file.name}-${index}`}
+                      label={`Support question ${index + 1}`}
+                      file={file}
+                      onRemove={() => {
+                        setQuestionSupportFiles((prev) => {
                           const newFiles = [...prev];
                           newFiles.splice(index, 1);
                           return newFiles;
@@ -330,76 +356,6 @@ export const CreateTemptation = () => {
 
             {/* Right Column - Uploads */}
             <div className="w-[464px] flex flex-col gap-6">
-              {/* Image/Video Placeholder */}
-              {uploadedImages.length > 0 ? (
-                <div className="flex flex-col gap-4">
-                  <div className="h-[364px] overflow-y-auto pr-2 custom-scrollbar">
-                    {uploadedImages.length === 1 ? (
-                      <div className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] w-full h-full overflow-hidden group">
-                        <img
-                          src={uploadedImages[0].src}
-                          alt="Uploaded content"
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          onClick={() => handleRemoveImage(uploadedImages[0].id)}
-                          className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer"
-                          aria-label="Remove image"
-                        >
-                          <DeleteIcon width={16} height={16} color="#fff" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-3">
-                        {uploadedImages.map((image) => (
-                          <div
-                            key={image.id}
-                            className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] h-[110px] overflow-hidden group"
-                          >
-                            <img
-                              src={image.src}
-                              alt="Uploaded content"
-                              className="w-full h-full object-cover"
-                            />
-                            <button
-                              onClick={() => handleRemoveImage(image.id)}
-                              className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer"
-                              aria-label="Remove image"
-                            >
-                              <DeleteIcon width={16} height={16} color="#fff" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    className="w-full h-[56px]"
-                    onClick={() => handleUploadButtonClick()}
-                  >
-                    Upload More
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div
-                    className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#965cdf] transition-colors"
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, 'image')}
-                    onClick={() => handleUploadButtonClick()}
-                  >
-                    <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                      No image uploaded
-                    </div>
-                  </div>
-                  <Button
-                    className="w-full h-[56px]"
-                    onClick={() => handleUploadButtonClick()}
-                  >
-                    Upload Files
-                  </Button>
-                </>
-              )}
 
               <div className="flex flex-col gap-4">
                 <label
@@ -437,6 +393,106 @@ export const CreateTemptation = () => {
                     style={{ fontFamily: 'Roboto, sans-serif' }}
                   />
                 </div>
+              </div>
+
+              {/* Recovery Images Section */}
+              <div className="flex flex-col gap-4">
+                <label
+                  className="text-white text-[16px] leading-[24px]"
+                  style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
+                >
+                  Recovery Images
+                </label>
+                {recoveryImages.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    {recoveryImages.map((image) => (
+                      <div
+                        key={image.id}
+                        className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] h-[110px] overflow-hidden group"
+                      >
+                        <img
+                          src={image.src}
+                          alt="Recovery content"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => {
+                            setRecoveryImages((prev) => prev.filter((img) => img.id !== image.id));
+                          }}
+                          className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer"
+                          aria-label="Remove image"
+                        >
+                          <DeleteIcon width={16} height={16} color="#fff" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[120px] flex items-center justify-center cursor-pointer hover:border-[#965cdf] transition-colors"
+                    onClick={() => handleUploadButtonClick('recoveryImage')}
+                  >
+                    <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                      No recovery images uploaded
+                    </div>
+                  </div>
+                )}
+                <Button
+                  className="w-full h-[56px]"
+                  onClick={() => handleUploadButtonClick('recoveryImage')}
+                >
+                  Upload Recovery Images
+                </Button>
+              </div>
+
+              {/* Support Images Section */}
+              <div className="flex flex-col gap-4">
+                <label
+                  className="text-white text-[16px] leading-[24px]"
+                  style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
+                >
+                  Support Images
+                </label>
+                {supportImages.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    {supportImages.map((image) => (
+                      <div
+                        key={image.id}
+                        className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] h-[110px] overflow-hidden group"
+                      >
+                        <img
+                          src={image.src}
+                          alt="Support content"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => {
+                            setSupportImages((prev) => prev.filter((img) => img.id !== image.id));
+                          }}
+                          className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer"
+                          aria-label="Remove image"
+                        >
+                          <DeleteIcon width={16} height={16} color="#fff" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[120px] flex items-center justify-center cursor-pointer hover:border-[#965cdf] transition-colors"
+                    onClick={() => handleUploadButtonClick('supportImage')}
+                  >
+                    <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                      No support images uploaded
+                    </div>
+                  </div>
+                )}
+                <Button
+                  className="w-full h-[56px]"
+                  onClick={() => handleUploadButtonClick('supportImage')}
+                >
+                  Upload Support Images
+                </Button>
               </div>
             </div>
           </div>
