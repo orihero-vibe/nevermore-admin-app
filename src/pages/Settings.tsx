@@ -128,7 +128,7 @@ export const Settings = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-neutral-950 min-h-screen p-8 flex items-center justify-center">
+      <div className="bg-neutral-950 min-h-screen flex items-center justify-center p-4 sm:p-8">
         <p className="text-white text-[16px]">Loading...</p>
       </div>
     );
@@ -147,17 +147,17 @@ export const Settings = () => {
     .slice(0, 2) || displayName[0]?.toUpperCase() || 'U';
 
   return (
-    <div className="bg-neutral-950 min-h-screen p-8">
+    <div className="bg-neutral-950 min-h-screen p-4 sm:p-6 lg:p-8">
       {/* Page Title */}
       <h1 
-        className="text-white text-[24px] leading-[normal] mb-8"
+        className="mb-6 text-white text-[20px] leading-tight sm:mb-8 sm:text-[24px] sm:leading-[normal]"
         style={{ fontFamily: 'Cinzel, serif', fontWeight: 400 }}
       >
         My Account
       </h1>
 
       {/* Profile Card */}
-      <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8 w-[536px] mx-auto flex flex-col items-center gap-16">
+      <div className="mx-auto flex w-full max-w-[536px] flex-col items-center gap-10 rounded-[16px] backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] p-4 sm:gap-16 sm:rounded-[24px] sm:p-8">
         {/* Profile Section */}
         <div className="flex flex-col items-center gap-2">
           {/* Avatar with Online Status */}
@@ -212,8 +212,8 @@ export const Settings = () => {
                 Email
               </label>
               <div className="relative">
-                <div className="w-full h-[56px] px-4 pr-12 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] flex items-center relative">
-                  <p className="flex-1 text-white font-lato text-[16px] leading-[24px]">
+                <div className="relative flex h-[56px] w-full min-w-0 items-center rounded-[16px] border border-[rgba(255,255,255,0.25)] bg-[#131313] px-4 pr-12">
+                  <p className="min-w-0 flex-1 truncate font-lato text-[16px] leading-[24px] text-white" title={displayEmail || undefined}>
                     {displayEmail || 'No email set'}
                   </p>
                   <button
@@ -238,8 +238,8 @@ export const Settings = () => {
                 Phone Number (Optional)
               </label>
               <div className="relative">
-                <div className="w-full h-[56px] px-4 pr-12 bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] flex items-center relative">
-                  <p className="flex-1 text-white font-lato text-[16px] leading-[24px]">
+                <div className="relative flex h-[56px] w-full min-w-0 items-center rounded-[16px] border border-[rgba(255,255,255,0.25)] bg-[#131313] px-4 pr-12">
+                  <p className="min-w-0 flex-1 truncate font-lato text-[16px] leading-[24px] text-white">
                     {displayPhone || 'No phone number set'}
                   </p>
                   <button

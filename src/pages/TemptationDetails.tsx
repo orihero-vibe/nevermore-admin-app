@@ -518,26 +518,26 @@ export const TemptationDetails = () => {
   return (
     <div className="bg-neutral-950 min-h-screen">
       {/* Header with Back Button, Title, and Action Buttons */}
-      <div className="flex items-center justify-between px-8 pt-9">
-        <div className="flex items-center gap-8">
+      <div className="flex flex-col gap-4 px-4 pt-6 sm:px-8 sm:pt-9 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 lg:gap-8">
           <button
             onClick={handleBack}
-            className="flex items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
+            className="flex w-fit shrink-0 items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
             style={{ fontFamily: 'Roboto, sans-serif' }}
           >
             <ChevronLeftIcon width={24} height={24} color="#965cdf" />
             <span>Back</span>
           </button>
           <h1
-            className="text-white text-[24px] leading-[normal]"
+            className="min-w-0 text-white text-[20px] leading-tight sm:text-[24px]"
             style={{ fontFamily: 'Cinzel, serif', fontWeight: 400 }}
           >
             Content Details
           </h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
           <Button
-            className="w-[120px] h-[56px]"
+            className="h-[56px] w-full sm:w-[120px]"
             onClick={isEditing ? handleSave : handleEdit}
             disabled={
               isSaving ||
@@ -548,7 +548,7 @@ export const TemptationDetails = () => {
             {isSaving ? `Saving... ${saveProgress}%` : isEditing ? 'Save' : 'Edit'}
           </Button>
           {isSaving && saveProgress > 0 && saveProgress < 100 && (
-            <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+            <div className="h-[4px] w-full max-w-[240px] rounded-full bg-[rgba(255,255,255,0.1)] overflow-hidden sm:w-[200px]">
               <div
                 className="bg-[#965cdf] h-full transition-all duration-300"
                 style={{ width: `${saveProgress}%` }}
@@ -557,7 +557,7 @@ export const TemptationDetails = () => {
           )}
           <Button
             variant="outline"
-            className="w-[120px] h-[56px]"
+            className="h-[56px] w-full sm:w-[120px]"
             onClick={handleDelete}
             disabled={isSaving || isDeleting || !temptationData?.id}
           >
@@ -567,14 +567,14 @@ export const TemptationDetails = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="px-8 pt-9 pb-8">
-        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8">
-          <div className="flex gap-16 items-start mb-16 relative">
+      <div className="px-4 pt-6 pb-6 sm:px-8 sm:pt-9 sm:pb-8">
+        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] sm:rounded-[24px] p-4 sm:p-8">
+          <div className="relative mb-10 flex flex-col gap-10 xl:mb-16 xl:flex-row xl:items-start xl:gap-16">
             {/* Left Column - Form Fields */}
-            <div className="flex-1 flex flex-col gap-10">
+            <div className="flex min-w-0 flex-1 flex-col gap-10">
               {/* Content Title and Upload Files Button */}
-              <div className="flex items-end justify-between gap-4">
-                <div className="flex-1">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-col gap-2">
                     <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
                       Title
@@ -584,18 +584,17 @@ export const TemptationDetails = () => {
                       onChange={(e) => setContentTitle(e.target.value)}
                       placeholder="Enter content title"
                       disabled={!isEditing}
-                      className="w-full bg-transparent border-none text-white focus:outline-none placeholder-[#616161] disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full min-w-0 bg-transparent border-none text-[22px] leading-tight text-white focus:outline-none placeholder-[#616161] disabled:opacity-60 disabled:cursor-not-allowed sm:text-[30px] lg:text-[40px]"
                       style={{ 
                         fontFamily: 'Cinzel, serif', 
                         fontWeight: 400,
-                        fontSize: '40px',
                         lineHeight: 'normal'
                       }}
                     />
                   </div>
                 </div>
                 <Button
-                  className="w-[120px] h-[56px]"
+                  className="h-[56px] w-full shrink-0 sm:w-[120px]"
                   onClick={() => handleUploadButtonClick()}
                   disabled={!isEditing}
                 >
@@ -756,8 +755,8 @@ export const TemptationDetails = () => {
             </div>
 
             {/* Right Column - Image and Transcript Upload */}
-            <div className="w-[464px] flex flex-col gap-6">
-            
+            <div className="flex w-full flex-col gap-6 xl:w-[464px] xl:shrink-0">
+
               {/* In-app transcripts (plain text, shown in mobile app) */}
               <div className="flex flex-col gap-4">
                 <label
@@ -808,7 +807,7 @@ export const TemptationDetails = () => {
                   Recovery Images
                 </label>
                 {recoveryImages.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {recoveryImages.map((image) => (
                       <div
                         key={image.id}
@@ -862,7 +861,7 @@ export const TemptationDetails = () => {
                   Support Images
                 </label>
                 {supportImages.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {supportImages.map((image) => (
                       <div
                         key={image.id}

@@ -19,12 +19,19 @@ const navigationItems = [
   },
 ];
 
-export const Sidebar = () => {
+interface SidebarProps {
+  /** Called after navigation actions so a mobile drawer can close */
+  onNavigate?: () => void;
+  className?: string;
+}
+
+export const Sidebar = ({ onNavigate, className = '' }: SidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, isLoading, user } = useStore();
 
   const handleSignOut = async () => {
+    onNavigate?.();
     try {
       await signOut();
       showSuccess('Signed out successfully');
@@ -37,7 +44,9 @@ export const Sidebar = () => {
   };
 
   return (
-    <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] text-white min-h-screen w-[248px] flex flex-col px-6 py-8">
+    <div
+      className={`backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] text-white min-h-screen w-full md:w-[248px] flex flex-col px-6 py-8 ${className}`}
+    >
       {/* User Profile Section */}
       <div className="mb-20">
         <UserProfile name={user?.name || user?.email || 'Admin'} />
@@ -53,6 +62,7 @@ export const Sidebar = () => {
             <Link
               key={item.path}
               to={item.path}
+              onClick={() => onNavigate?.()}
               className={`flex items-center gap-3 p-4 rounded-[16px] transition ${
                 isActive
                   ? 'backdrop-blur-[25px] bg-[rgba(255,255,255,0.1)] text-white'
@@ -92,6 +102,7 @@ export const Sidebar = () => {
       <div className="mt-auto pt-4 text-center">
         <Link
           to="/terms"
+          onClick={() => onNavigate?.()}
           className="block text-[#8f8f8f] text-[12px] leading-[16px] hover:text-white transition mb-1"
           style={{ fontFamily: 'Roboto, sans-serif' }}
         >
@@ -99,6 +110,7 @@ export const Sidebar = () => {
         </Link>
         <Link
           to="/privacy"
+          onClick={() => onNavigate?.()}
           className="block text-[#8f8f8f] text-[12px] leading-[16px] hover:text-white transition"
           style={{ fontFamily: 'Roboto, sans-serif' }}
         >

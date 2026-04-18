@@ -239,19 +239,19 @@ export const ContentManagement = () => {
   };
 
   return (
-    <div className="bg-neutral-950 min-h-screen p-8">
+    <div className="bg-neutral-950 min-h-screen p-4 sm:p-6 lg:p-8">
       {/* Page Title */}
       <h1 
-        className="text-white text-[16px] leading-[24px] mb-8"
+        className="text-white text-[16px] leading-[24px] mb-6 sm:mb-8"
         style={{ fontFamily: 'Cinzel, serif', fontWeight: 550 }}
       >
         Content Management
       </h1>
 
       {/* Header Controls */}
-      <div className="mb-6 flex flex-wrap gap-4 items-center">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
         {/* Search Bar */}
-        <div className="flex-1 w-[250px]">
+        <div className="w-full sm:flex-1 sm:min-w-[200px]">
           <SearchBar
             placeholder="Search"
             value={searchQuery}
@@ -262,7 +262,7 @@ export const ContentManagement = () => {
         </div>
 
         {/* Filter Dropdowns */}
-        <div className="w-[200px]">
+        <div className="w-full sm:w-[200px] sm:shrink-0">
           <Select
             options={categoryOptions}
             value={selectedCategory}
@@ -274,7 +274,7 @@ export const ContentManagement = () => {
           />
         </div>
 
-        <div className="w-[160px]">
+        <div className="w-full sm:w-[160px] sm:shrink-0">
           <Select
             options={typeOptions}
             value={selectedType}
@@ -287,7 +287,7 @@ export const ContentManagement = () => {
         </div>
 
         {/* Upload Button */}
-        <Button className="w-[208px] text-white bg-[#965cdf]" variant="primary" onClick={() => setIsUploadModalOpen(true)}>
+        <Button className="w-full sm:w-[208px] sm:shrink-0 text-white bg-[#965cdf]" variant="primary" onClick={() => setIsUploadModalOpen(true)}>
           Upload New Content
         </Button>
       </div>
@@ -341,7 +341,7 @@ export const ContentManagement = () => {
           
           {/* Modal Content */}
           <div
-            className="relative backdrop-blur-[20px] bg-[rgba(255,255,255,0.1)] rounded-[16px] px-[32px] py-[40px] w-[406px] flex flex-col gap-[32px] items-start"
+            className="relative mx-4 w-full max-w-[406px] backdrop-blur-[20px] bg-[rgba(255,255,255,0.1)] rounded-[16px] px-6 py-8 sm:px-[32px] sm:py-[40px] flex flex-col gap-6 sm:gap-[32px] items-start"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Title */}

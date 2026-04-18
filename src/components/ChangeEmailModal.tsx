@@ -79,7 +79,7 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4"
       onClick={isLoading ? undefined : onClose}
     >
       {/* Backdrop */}
@@ -87,13 +87,13 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
 
       {/* Modal Content */}
       <div
-        className="relative backdrop-blur-[10px] bg-[rgba(255,255,255,0.1)] rounded-[16px] p-8 w-[406px] flex flex-col gap-6"
+        className="relative my-auto flex w-full max-w-[406px] max-h-[min(90vh,calc(100dvh-2rem))] flex-col gap-6 overflow-y-auto rounded-[16px] backdrop-blur-[10px] bg-[rgba(255,255,255,0.1)] p-6 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-3">
           <h2
-            className="text-white text-[24px] leading-normal"
+            className="min-w-0 flex-1 text-white text-[20px] leading-tight sm:text-[24px] sm:leading-normal"
             style={{ fontFamily: 'Cinzel, serif', fontWeight: 400 }}
           >
             Change Email
@@ -179,17 +179,17 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
         </div>
 
         {/* Buttons */}
-        <div className="flex gap-4">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:gap-4">
           <button
             onClick={handleSave}
-            className="flex-1 h-[56px] rounded-[12px] bg-[#965CDF] text-white hover:bg-[#8549c9] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium text-[16px] font-roboto"
+            className="h-[56px] w-full flex-1 rounded-[12px] bg-[#965CDF] font-roboto text-[16px] font-medium text-white transition-colors duration-200 hover:bg-[#8549c9] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!newEmail || !currentPassword || isLoading}
           >
             {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
           <button
             onClick={onClose}
-            className="flex-1 h-[56px] rounded-[12px] bg-[#131313] border border-[#965cdf] text-white hover:bg-[#1a1a1a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium text-[16px] font-roboto"
+            className="h-[56px] w-full flex-1 rounded-[12px] border border-[#965cdf] bg-[#131313] font-roboto text-[16px] font-medium text-white transition-colors duration-200 hover:bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isLoading}
           >
             Cancel

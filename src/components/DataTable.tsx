@@ -27,17 +27,17 @@ export function DataTable<T extends Record<string, unknown>>({
   };
 
   return (
-    <div className={`overflow-x-auto ${className}`}>
-      <table className="w-full" style={{ borderSpacing: '0 0', borderCollapse: 'separate' }}>
+    <div className={`-mx-1 overflow-x-auto sm:mx-0 ${className}`}>
+      <table className="w-full min-w-[520px]" style={{ borderSpacing: '0 0', borderCollapse: 'separate' }}>
         <thead>
           <tr className="border-b-2 border-[#965cdf]">
             {columns.map((column, index) => (
               <th
                 key={String(column.key)}
-                className={`text-left py-4 font-medium text-[16px] text-[#8f8f8f] leading-[24px] ${
-                  index === 0 ? 'pl-6' : 'px-6'
-                } ${index === columns.length - 1 ? 'pr-6' : ''}`}
-                style={{ fontFamily: 'Roboto, sans-serif', paddingLeft: index === 0 ? '24px' : undefined, paddingRight: '24px' }}
+                className={`text-left py-3 font-medium text-[14px] text-[#8f8f8f] leading-[22px] sm:py-4 sm:text-[16px] sm:leading-[24px] ${
+                  index === 0 ? 'pl-3 sm:pl-6' : 'px-3 sm:px-6'
+                } ${index === columns.length - 1 ? 'pr-3 sm:pr-6' : ''}`}
+                style={{ fontFamily: 'Roboto, sans-serif' }}
               >
                 {column.label}
               </th>
@@ -49,7 +49,7 @@ export function DataTable<T extends Record<string, unknown>>({
             <tr
               key={rowIndex}
               onClick={() => onRowClick?.(row)}
-              className={`h-[80px] border-b border-[rgba(255,255,255,0.1)] ${
+              className={`min-h-[64px] sm:h-[80px] border-b border-[rgba(255,255,255,0.1)] ${
                 rowIndex % 2 === 0 ? 'bg-[rgba(255,255,255,0.05)]' : ''
               } hover:bg-[rgba(255,255,255,0.08)] transition ${
                 onRowClick ? 'cursor-pointer' : ''
@@ -58,10 +58,10 @@ export function DataTable<T extends Record<string, unknown>>({
               {columns.map((column, colIndex) => (
                 <td
                   key={String(column.key)}
-                  className={`text-white text-[14px] leading-[24px] ${
-                    colIndex === 0 ? 'pl-6' : 'px-6'
-                  } ${colIndex === columns.length - 1 ? 'pr-6' : ''}`}
-                  style={{ fontFamily: 'Roboto, sans-serif', paddingLeft: colIndex === 0 ? '24px' : undefined, paddingRight: '24px' }}
+                  className={`text-white text-[13px] leading-[22px] sm:text-[14px] sm:leading-[24px] py-3 sm:py-0 ${
+                    colIndex === 0 ? 'pl-3 sm:pl-6' : 'px-3 sm:px-6'
+                  } ${colIndex === columns.length - 1 ? 'pr-3 sm:pr-6' : ''}`}
+                  style={{ fontFamily: 'Roboto, sans-serif' }}
                 >
                   {getCellValue(row, column) as React.ReactNode}
                 </td>

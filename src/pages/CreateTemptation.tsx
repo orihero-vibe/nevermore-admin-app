@@ -213,17 +213,17 @@ export const CreateTemptation = () => {
   return (
     <div className="bg-neutral-950 min-h-screen">
       {/* Header with Back Button and Title */}
-      <div className="flex items-center px-8 pt-9">
+      <div className="flex flex-col gap-3 px-4 pt-6 sm:flex-row sm:items-center sm:gap-6 sm:px-8 sm:pt-9">
         <button
           onClick={handleBack}
-          className="flex items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
+          className="flex w-fit shrink-0 items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
           style={{ fontFamily: 'Roboto, sans-serif' }}
         >
           <ChevronLeftIcon width={24} height={24} color="#965cdf" />
           <span>Back</span>
         </button>
         <h1
-          className="ml-8 text-white text-[24px] leading-[normal]"
+          className="min-w-0 text-white text-[20px] leading-tight sm:ml-2 sm:text-[24px] md:ml-8"
           style={{ fontFamily: 'Cinzel, serif', fontWeight: 400 }}
         >
           40 TEMPTATIONS
@@ -231,11 +231,11 @@ export const CreateTemptation = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="px-8 pt-9 pb-8">
-        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8">
-          <div className="flex gap-16 items-start">
+      <div className="px-4 pt-6 pb-6 sm:px-8 sm:pt-9 sm:pb-8">
+        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] sm:rounded-[24px] p-4 sm:p-8">
+          <div className="flex flex-col gap-10 xl:flex-row xl:items-start xl:gap-16">
             {/* Left Column - Form Fields */}
-            <div className="flex-1 flex flex-col gap-10">
+            <div className="flex min-w-0 flex-1 flex-col gap-10">
               {/* Content Title */}
               <div className="flex items-end justify-between gap-4">
                 <div className="flex-1 flex flex-col gap-2">
@@ -355,7 +355,7 @@ export const CreateTemptation = () => {
             </div>
 
             {/* Right Column - Uploads */}
-            <div className="w-[464px] flex flex-col gap-6">
+            <div className="flex w-full flex-col gap-6 xl:w-[464px] xl:shrink-0">
 
               <div className="flex flex-col gap-4">
                 <label
@@ -404,7 +404,7 @@ export const CreateTemptation = () => {
                   Recovery Images
                 </label>
                 {recoveryImages.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {recoveryImages.map((image) => (
                       <div
                         key={image.id}
@@ -454,7 +454,7 @@ export const CreateTemptation = () => {
                   Support Images
                 </label>
                 {supportImages.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {supportImages.map((image) => (
                       <div
                         key={image.id}
@@ -498,23 +498,23 @@ export const CreateTemptation = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4 items-center justify-center mt-8">
+          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-center sm:gap-4">
             <button
               onClick={handleCancel}
               disabled={isPublishing}
-              className="w-[120px] h-[56px] rounded-[12px] border border-[#965cdf] text-white font-roboto font-medium text-[16px] leading-normal hover:bg-[rgba(150,92,223,0.1)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-[56px] w-full rounded-[12px] border border-[#965cdf] text-white font-roboto font-medium text-[16px] leading-normal hover:bg-[rgba(150,92,223,0.1)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:w-[120px]"
             >
               Cancel
             </button>
             <Button
               onClick={handlePublish}
-              className="w-[120px] h-[56px] rounded-[12px]"
+              className="h-[56px] w-full rounded-[12px] sm:w-[120px]"
               disabled={isPublishing}
             >
               {isPublishing ? `Publishing... ${publishProgress}%` : 'Publish'}
             </Button>
             {isPublishing && publishProgress > 0 && publishProgress < 100 && (
-              <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+              <div className="h-[4px] w-full max-w-[240px] rounded-full bg-[rgba(255,255,255,0.1)] overflow-hidden sm:w-[200px]">
                 <div
                   className="bg-[#965cdf] h-full transition-all duration-300"
                   style={{ width: `${publishProgress}%` }}
