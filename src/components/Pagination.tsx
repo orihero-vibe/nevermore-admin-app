@@ -77,9 +77,9 @@ export const Pagination: React.FC<PaginationProps> = ({
   const visiblePages = getVisiblePages();
 
   return (
-    <div className="flex items-center justify-between mt-6">
+    <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       {/* Left side: Show dropdown */}
-      <div className="flex items-center gap-4">
+      <div className="order-3 flex items-center gap-4 sm:order-none">
         <span 
           className="text-[#8f8f8f] text-[14px] leading-[24px]"
           style={{ fontFamily: 'Roboto, sans-serif' }}
@@ -118,14 +118,14 @@ export const Pagination: React.FC<PaginationProps> = ({
 
       {/* Center: Showing count */}
       <div 
-        className="text-[#8f8f8f] text-[14px] leading-[24px]"
+        className="order-1 text-center text-[#8f8f8f] text-[14px] leading-[24px] sm:order-none sm:flex-1 sm:text-left"
         style={{ fontFamily: 'Roboto, sans-serif' }}
       >
         Showing {startItem} - {endItem} of {totalItems}
       </div>
 
       {/* Right side: Page navigation */}
-      <div className="flex items-center gap-6">
+      <div className="order-2 flex items-center justify-center gap-3 sm:order-none sm:justify-end sm:gap-6">
         <button
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
@@ -136,7 +136,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           <ChevronLeftIcon width={24} height={24} />
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex max-w-[100vw] flex-wrap items-center justify-center gap-1 sm:gap-2 px-1">
           {visiblePages.map((page, index) => {
           if (typeof page === 'string') {
             return (

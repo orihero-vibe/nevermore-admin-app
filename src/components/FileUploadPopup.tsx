@@ -1,10 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import CloudUploadIcon from '../assets/icons/cloud-upload';
 import CloseIcon from '../assets/icons/close';
 import { Select } from './Select';
 import type { SelectOption } from './Select';
 import { Button } from './Button';
 import { showWarning } from '../lib/notifications';
+import {
+  fileExceedsMaxUpload,
+  formatFileSize,
+  getConfiguredMaxUploadBytes,
+} from '../lib/uploadLimits';
 
 export interface UploadFile {
   id: string;
@@ -42,6 +47,7 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
 }) => {
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputId = useId();
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -102,9 +108,22 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
       fileType.startsWith('image/') ||
       fileName.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg|ico)$/i)
     ) {
+      // If preferredContentType is set and it's an image type, use that
+      if (preferredContentType && 
+          (preferredContentType === 'recoveryImage' || preferredContentType === 'supportImage') &&
+          contentTypes.some(ct => ct.value === preferredContentType)) {
+        return preferredContentType;
+      }
       // Check if 'image' content type exists in options
       if (contentTypes.some(ct => ct.value === 'image')) {
         return 'image';
+      }
+      // Check for recovery/support image types
+      if (contentTypes.some(ct => ct.value === 'recoveryImage')) {
+        return 'recoveryImage';
+      }
+      if (contentTypes.some(ct => ct.value === 'supportImage')) {
+        return 'supportImage';
       }
     }
 
@@ -113,12 +132,29 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
       fileType.startsWith('audio/') ||
       fileName.match(/\.(mp3|wav|m4a|aac|ogg|flac|wma|opus)$/i)
     ) {
-      // For new content types, default to 'question' for audio
-      if (contentTypes.some(ct => ct.value === 'question')) {
+      if (
+        preferredContentType &&
+        (preferredContentType === 'questionRecovery' ||
+          preferredContentType === 'questionSupport') &&
+        contentTypes.some((ct) => ct.value === preferredContentType)
+      ) {
+        return preferredContentType;
+      }
+      const hasQuestionRecovery = contentTypes.some((ct) => ct.value === 'questionRecovery');
+      const hasQuestionSupport = contentTypes.some((ct) => ct.value === 'questionSupport');
+      if (hasQuestionRecovery && hasQuestionSupport) {
+        return 'questionRecovery';
+      }
+      if (hasQuestionRecovery) {
+        return 'questionRecovery';
+      }
+      if (hasQuestionSupport) {
+        return 'questionSupport';
+      }
+      if (contentTypes.some((ct) => ct.value === 'question')) {
         return 'question';
       }
-      // Legacy fallback
-      if (contentTypes.some(ct => ct.value === 'audio')) {
+      if (contentTypes.some((ct) => ct.value === 'audio')) {
         return 'audio';
       }
     }
@@ -163,6 +199,8 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
     // Create UploadFile objects with auto-detected content types
     const newFiles: UploadFile[] = [];
     let discardedCount = 0;
+    let oversizedCount = 0;
+    const maxUploadBytes = getConfiguredMaxUploadBytes();
 
     const existingTranscriptCount = uploadFiles.filter((uf) =>
       transcriptTypes.includes(uf.contentType)
@@ -171,6 +209,11 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
     let newTranscriptCount = 0;
 
     files.forEach((file) => {
+      if (fileExceedsMaxUpload(file, maxUploadBytes)) {
+        oversizedCount++;
+        return;
+      }
+
       const detectedType = detectContentType(file);
       
       // Check if this is a single-file type and if one already exists
@@ -251,6 +294,12 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
         contentType: detectedType,
       });
     });
+
+       if (oversizedCount > 0) {
+      showWarning(
+        `${oversizedCount} file(s) were not added — each must be ${formatFileSize(maxUploadBytes)} or smaller. Use smaller or compressed files, or ask your administrator to raise the upload limit.`
+      );
+    }
 
     // Show warning if files were discarded
     if (discardedCount > 0) {
@@ -352,12 +401,12 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
           {title}
         </h2>
 
-        {/* Drag & Drop Area */}
-        <div
+        {/* Drag & Drop Area — label opens picker on iPad/iOS Safari (programmatic .click() on display:none inputs is blocked) */}
+        <label
+          htmlFor={fileInputId}
           className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
           onDragOver={handleDragOver}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
         >
           <CloudUploadIcon width={48} height={48} color="#fff" />
           <div className="text-center">
@@ -374,15 +423,23 @@ export const FileUploadPopup: React.FC<FileUploadPopupProps> = ({
             >
               Supported formats: {supportedFormats}
             </p>
+            <p
+              className="text-[#8f8f8f] text-[12px] leading-[16px]"
+              style={{ fontFamily: 'Roboto, sans-serif' }}
+            >
+              Maximum size: {formatFileSize(getConfiguredMaxUploadBytes())} per file
+            </p>
           </div>
-        </div>
+        </label>
         <input
+          id={fileInputId}
           ref={fileInputRef}
           type="file"
           accept={accept}
           multiple
           onChange={handleFileSelect}
-          className="hidden"
+          className="sr-only"
+          tabIndex={-1}
         />
 
         {/* Uploading Files List - Scrollable */}

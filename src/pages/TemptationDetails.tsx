@@ -16,10 +16,12 @@ import { useCategoriesStore } from '../store/categoriesStore';
 
 // Content type options for file upload (matching CreateTemptation)
 const contentTypeOptions: SelectOption[] = [
-  { value: 'image', label: 'Image' },
   { value: 'mainContentSupport', label: 'Main Content (Support)' },
   { value: 'mainContentRecovery', label: 'Main Content (Recovery)' },
-  { value: 'question', label: 'Question' },
+  { value: 'questionRecovery', label: 'Question (Recovery)' },
+  { value: 'questionSupport', label: 'Question (Support)' },
+  { value: 'recoveryImage', label: 'Recovery Image' },
+  { value: 'supportImage', label: 'Support Image' },
 ];
 
 interface TemptationData {
@@ -43,17 +45,20 @@ export const TemptationDetails = () => {
 
   const [contentTitle, setContentTitle] = useState('');
   const [categoryType, setCategoryType] = useState('');
-  const [uploadedImages, setUploadedImages] = useState<Array<{ id: string; src: string; file?: File; url?: string }>>([]);
   
   // New file state based on content types (matching CreateTemptation)
-  const [questionAudioFiles, setQuestionAudioFiles] = useState<File[]>([]);
-  const [questionAudioUrls, setQuestionAudioUrls] = useState<string[]>([]);
+  const [questionRecoveryFiles, setQuestionRecoveryFiles] = useState<File[]>([]);
+  const [questionSupportFiles, setQuestionSupportFiles] = useState<File[]>([]);
+  const [questionRecoveryUrls, setQuestionRecoveryUrls] = useState<string[]>([]);
+  const [questionSupportUrls, setQuestionSupportUrls] = useState<string[]>([]);
   const [mainContentSupportFile, setMainContentSupportFile] = useState<File | null>(null);
   const [mainContentSupportUrl, setMainContentSupportUrl] = useState<string | null>(null);
   const [mainContentRecoveryFile, setMainContentRecoveryFile] = useState<File | null>(null);
   const [mainContentRecoveryUrl, setMainContentRecoveryUrl] = useState<string | null>(null);
   const [transcriptSupportText, setTranscriptSupportText] = useState('');
   const [transcriptRecoveryText, setTranscriptRecoveryText] = useState('');
+  const [recoveryImages, setRecoveryImages] = useState<Array<{ id: string; src: string; file?: File; url?: string }>>([]);
+  const [supportImages, setSupportImages] = useState<Array<{ id: string; src: string; file?: File; url?: string }>>([]);
   
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -83,19 +88,15 @@ export const TemptationDetails = () => {
           if (contentDoc) {
             setOriginalContentData(contentDoc);
             
-            // Load images from URLs
-            if (contentDoc.images && contentDoc.images.length > 0) {
-              const loadedImages = contentDoc.images.map((url, index) => ({
-                id: `existing-${index}-${Date.now()}`,
-                src: url,
-                url: url,
-              }));
-              setUploadedImages(loadedImages);
-            }
             
-            // Load question audio files from URLs (stored in 'files' field)
-            if (contentDoc.files && contentDoc.files.length > 0) {
-              setQuestionAudioUrls(contentDoc.files);
+            const recQ = (contentDoc.recoveryQuestionFiles as string[] | undefined)?.filter(Boolean) || [];
+            const supQ = (contentDoc.supportQuestionFiles as string[] | undefined)?.filter(Boolean) || [];
+            if (recQ.length > 0 || supQ.length > 0) {
+              setQuestionRecoveryUrls(recQ);
+              setQuestionSupportUrls(supQ);
+            } else if (contentDoc.files && contentDoc.files.length > 0) {
+              setQuestionRecoveryUrls([...contentDoc.files]);
+              setQuestionSupportUrls([]);
             }
             
             // Load Main Content (Support) URL
@@ -114,6 +115,26 @@ export const TemptationDetails = () => {
             setTranscriptRecoveryText(
               typeof contentDoc.transcriptRecoveryText === 'string' ? contentDoc.transcriptRecoveryText : ''
             );
+            
+            // Load Recovery images from URLs
+            if (contentDoc.recoveryImages && contentDoc.recoveryImages.length > 0) {
+              const loadedRecoveryImages = contentDoc.recoveryImages.map((url, index) => ({
+                id: `existing-recovery-${index}-${Date.now()}`,
+                src: url,
+                url: url,
+              }));
+              setRecoveryImages(loadedRecoveryImages);
+            }
+            
+            // Load Support images from URLs
+            if (contentDoc.supportImages && contentDoc.supportImages.length > 0) {
+              const loadedSupportImages = contentDoc.supportImages.map((url, index) => ({
+                id: `existing-support-${index}-${Date.now()}`,
+                src: url,
+                url: url,
+              }));
+              setSupportImages(loadedSupportImages);
+            }
           }
         } catch (error) {
           console.error('Error loading content data:', error);
@@ -154,51 +175,36 @@ export const TemptationDetails = () => {
     navigate('/content-management');
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
 
-  const handleDrop = (e: React.DragEvent, type: 'image') => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0 && type === 'image') {
-      files.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setUploadedImages((prev) => [
-            ...prev,
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              src: reader.result as string,
-              file,
-            },
-          ]);
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-  };
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = () => {
     if (!temptationData?.id) return false;
-    
+    if (!originalContentData) return false;
+
     const titleChanged = contentTitle.trim() !== originalTitle.trim();
     const categoryChanged = categoryType !== originalCategory;
     
     // Check if new files were uploaded
-    const newImagesUploaded = uploadedImages.some(img => img.file);
-    const newQuestionAudioUploaded = questionAudioFiles.length > 0;
+    const newQuestionRecoveryUploaded = questionRecoveryFiles.length > 0;
+    const newQuestionSupportUploaded = questionSupportFiles.length > 0;
     const newMainContentSupportUploaded = mainContentSupportFile !== null;
     const newMainContentRecoveryUploaded = mainContentRecoveryFile !== null;
-    // Check if existing files were removed (compare existing image count with original)
-    const originalImageCount = originalContentData?.images?.length || 0;
-    const currentExistingImageCount = uploadedImages.filter(img => img.url && !img.file).length;
-    const imagesRemoved = currentExistingImageCount < originalImageCount;
-    const questionAudioRemoved = originalContentData?.files && originalContentData.files.length > 0 && questionAudioFiles.length === 0 && questionAudioUrls.length === 0;
+    const newRecoveryImagesUploaded = recoveryImages.some(img => img.file);
+    const newSupportImagesUploaded = supportImages.some(img => img.file);
+    // Check if existing files were removed
+    const hadSplitQuestions =
+      (originalContentData?.recoveryQuestionFiles?.length ?? 0) > 0 ||
+      (originalContentData?.supportQuestionFiles?.length ?? 0) > 0;
+    const hadLegacyQuestions = !hadSplitQuestions && (originalContentData?.files?.length ?? 0) > 0;
+    const questionRecoveryRemoved =
+      (hadSplitQuestions || hadLegacyQuestions) &&
+      questionRecoveryFiles.length === 0 &&
+      questionRecoveryUrls.length === 0;
+    const questionSupportRemoved =
+      hadSplitQuestions &&
+      questionSupportFiles.length === 0 &&
+      questionSupportUrls.length === 0;
     const mainContentSupportRemoved = originalContentData?.mainContentSupportURL && !mainContentSupportFile && !mainContentSupportUrl;
     const mainContentRecoveryRemoved = originalContentData?.mainContentRecoveryURL && !mainContentRecoveryFile && !mainContentRecoveryUrl;
     const originalSupportText = (originalContentData?.transcriptSupportText as string | undefined) || '';
@@ -206,11 +212,32 @@ export const TemptationDetails = () => {
     const transcriptSupportChanged = transcriptSupportText !== originalSupportText;
     const transcriptRecoveryChanged = transcriptRecoveryText !== originalRecoveryText;
 
-    const filesChanged = newImagesUploaded || newQuestionAudioUploaded || 
-      newMainContentSupportUploaded || newMainContentRecoveryUploaded || 
-      imagesRemoved || questionAudioRemoved || 
-      mainContentSupportRemoved || mainContentRecoveryRemoved ||
-      transcriptSupportChanged || transcriptRecoveryChanged;
+    const legacyQuestions = hadLegacyQuestions;
+    const baselineRecoveryUrls = legacyQuestions
+      ? [...(originalContentData.files || [])]
+      : [...(originalContentData.recoveryQuestionFiles || [])];
+    const baselineSupportUrls = legacyQuestions
+      ? []
+      : [...(originalContentData.supportQuestionFiles || [])];
+    const normUrls = (arr: string[]) => [...arr].sort().join('|');
+    const questionUrlsChanged =
+      normUrls(questionRecoveryUrls) !== normUrls(baselineRecoveryUrls) ||
+      normUrls(questionSupportUrls) !== normUrls(baselineSupportUrls);
+
+    const filesChanged =
+      newQuestionRecoveryUploaded ||
+      newQuestionSupportUploaded ||
+      newMainContentSupportUploaded ||
+      newMainContentRecoveryUploaded ||
+      questionRecoveryRemoved ||
+      questionSupportRemoved ||
+      questionUrlsChanged ||
+      mainContentSupportRemoved ||
+      mainContentRecoveryRemoved ||
+      transcriptSupportChanged ||
+      transcriptRecoveryChanged ||
+      newRecoveryImagesUploaded ||
+      newSupportImagesUploaded;
     
     return titleChanged || categoryChanged || filesChanged;
   };
@@ -237,12 +264,6 @@ export const TemptationDetails = () => {
       return;
     }
 
-    // Check for at least one image (new file or existing URL)
-    const hasImages = uploadedImages.length > 0;
-    if (!hasImages) {
-      showAppwriteError(new Error('Please upload at least one image'));
-      return;
-    }
 
     // Check for Main Content Support (new file or existing URL)
     if (!mainContentSupportFile && !mainContentSupportUrl) {
@@ -266,10 +287,23 @@ export const TemptationDetails = () => {
       return;
     }
 
-    // Check for at least one Question audio (new file or existing URL)
-    const hasQuestionAudio = questionAudioFiles.length > 0 || questionAudioUrls.length > 0;
-    if (!hasQuestionAudio) {
-      showAppwriteError(new Error('Please upload at least one Question audio file'));
+    const hasRecoveryQ =
+      questionRecoveryFiles.length > 0 || questionRecoveryUrls.length > 0;
+    const hasSupportQ =
+      questionSupportFiles.length > 0 || questionSupportUrls.length > 0;
+
+    if (!hasRecoveryQ) {
+      showAppwriteError(new Error('Please add at least one Recovery question audio file'));
+      return;
+    }
+
+    const isLegacyQuestionFormat =
+      !originalContentData?.recoveryQuestionFiles?.length &&
+      !originalContentData?.supportQuestionFiles?.length &&
+      (originalContentData?.files?.length ?? 0) > 0;
+
+    if (!isLegacyQuestionFormat && !hasSupportQ) {
+      showAppwriteError(new Error('Please add at least one Support question audio file'));
       return;
     }
 
@@ -277,26 +311,32 @@ export const TemptationDetails = () => {
     setSaveProgress(0);
 
     try {
-      // Extract File objects from newly uploaded images (only those with file property)
-      const newImageFiles = uploadedImages.filter((img) => img.file).map((img) => img.file!);
+      // Extract File objects from newly uploaded recovery and support images
+      const newRecoveryImageFiles = recoveryImages.filter((img) => img.file).map((img) => img.file!);
+      const newSupportImageFiles = supportImages.filter((img) => img.file).map((img) => img.file!);
       
-      // Preserve existing image URLs (those without file property)
-      const existingImageUrls = uploadedImages.filter((img) => img.url && !img.file).map((img) => img.url!);
+      // Preserve existing recovery and support image URLs
+      const existingRecoveryImageUrls = recoveryImages.filter((img) => img.url && !img.file).map((img) => img.url!);
+      const existingSupportImageUrls = supportImages.filter((img) => img.url && !img.file).map((img) => img.url!);
       
       // Prepare temptation files
       const temptationFiles: TemptationFiles = {
-        imageFiles: newImageFiles,
-        questionFiles: questionAudioFiles,
+        questionRecoveryFiles,
+        questionSupportFiles,
         mainContentSupportFile: mainContentSupportFile,
         mainContentRecoveryFile: mainContentRecoveryFile,
+        recoveryImageFiles: newRecoveryImageFiles,
+        supportImageFiles: newSupportImageFiles,
       };
       
       // Prepare existing URLs
       const existingUrls: ExistingTemptationUrls = {
-        imageUrls: existingImageUrls,
-        questionUrls: questionAudioUrls,
+        questionRecoveryUrls,
+        questionSupportUrls,
         mainContentSupportURL: mainContentSupportUrl,
         mainContentRecoveryURL: mainContentRecoveryUrl,
+        recoveryImageUrls: existingRecoveryImageUrls,
+        supportImageUrls: existingSupportImageUrls,
       };
       
       // Update content (uploads new files and updates content document, preserving existing URLs)
@@ -321,23 +361,18 @@ export const TemptationDetails = () => {
       if (updatedContent) {
         setOriginalContentData(updatedContent);
         
-        // Reload images
-        if (updatedContent.images && updatedContent.images.length > 0) {
-          const reloadedImages = updatedContent.images.map((url, index) => ({
-            id: `existing-${index}-${Date.now()}`,
-            src: url,
-            url: url,
-          }));
-          setUploadedImages(reloadedImages);
-        } else {
-          setUploadedImages([]);
-        }
         
-        // Reload question audio URLs
-        if (updatedContent.files && updatedContent.files.length > 0) {
-          setQuestionAudioUrls(updatedContent.files);
+        const uRec = (updatedContent.recoveryQuestionFiles as string[] | undefined)?.filter(Boolean) || [];
+        const uSup = (updatedContent.supportQuestionFiles as string[] | undefined)?.filter(Boolean) || [];
+        if (uRec.length > 0 || uSup.length > 0) {
+          setQuestionRecoveryUrls(uRec);
+          setQuestionSupportUrls(uSup);
+        } else if (updatedContent.files && updatedContent.files.length > 0) {
+          setQuestionRecoveryUrls([...updatedContent.files]);
+          setQuestionSupportUrls([]);
         } else {
-          setQuestionAudioUrls([]);
+          setQuestionRecoveryUrls([]);
+          setQuestionSupportUrls([]);
         }
         
         // Reload Main Content URLs
@@ -350,6 +385,30 @@ export const TemptationDetails = () => {
         setTranscriptRecoveryText(
           typeof updatedContent.transcriptRecoveryText === 'string' ? updatedContent.transcriptRecoveryText : ''
         );
+        
+        // Reload Recovery images
+        if (updatedContent.recoveryImages && updatedContent.recoveryImages.length > 0) {
+          const reloadedRecoveryImages = updatedContent.recoveryImages.map((url, index) => ({
+            id: `existing-recovery-${index}-${Date.now()}`,
+            src: url,
+            url: url,
+          }));
+          setRecoveryImages(reloadedRecoveryImages);
+        } else {
+          setRecoveryImages([]);
+        }
+        
+        // Reload Support images
+        if (updatedContent.supportImages && updatedContent.supportImages.length > 0) {
+          const reloadedSupportImages = updatedContent.supportImages.map((url, index) => ({
+            id: `existing-support-${index}-${Date.now()}`,
+            src: url,
+            url: url,
+          }));
+          setSupportImages(reloadedSupportImages);
+        } else {
+          setSupportImages([]);
+        }
       }
 
       // Update original values after successful save
@@ -357,7 +416,8 @@ export const TemptationDetails = () => {
       setOriginalCategory(categoryType);
       
       // Clear newly uploaded files (keep URLs)
-      setQuestionAudioFiles([]);
+      setQuestionRecoveryFiles([]);
+      setQuestionSupportFiles([]);
       setMainContentSupportFile(null);
       setMainContentRecoveryFile(null);
       // Navigate back to content management after successful save
@@ -405,10 +465,22 @@ export const TemptationDetails = () => {
     // Route files to their appropriate places based on content type (matching CreateTemptation)
     uploadFiles.forEach((uploadFile) => {
       switch (uploadFile.contentType) {
-        case 'image': {
+        case 'questionRecovery':
+          setQuestionRecoveryFiles((prev) => [...prev, uploadFile.file]);
+          break;
+        case 'questionSupport':
+          setQuestionSupportFiles((prev) => [...prev, uploadFile.file]);
+          break;
+        case 'mainContentSupport':
+          setMainContentSupportFile(uploadFile.file);
+          break;
+        case 'mainContentRecovery':
+          setMainContentRecoveryFile(uploadFile.file);
+          break;
+        case 'recoveryImage': {
           const reader = new FileReader();
           reader.onloadend = () => {
-            setUploadedImages((prev) => [
+            setRecoveryImages((prev) => [
               ...prev,
               {
                 id: `${Date.now()}-${Math.random()}`,
@@ -420,15 +492,21 @@ export const TemptationDetails = () => {
           reader.readAsDataURL(uploadFile.file);
           break;
         }
-        case 'question':
-          setQuestionAudioFiles((prev) => [...prev, uploadFile.file]);
+        case 'supportImage': {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setSupportImages((prev) => [
+              ...prev,
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                src: reader.result as string,
+                file: uploadFile.file,
+              },
+            ]);
+          };
+          reader.readAsDataURL(uploadFile.file);
           break;
-        case 'mainContentSupport':
-          setMainContentSupportFile(uploadFile.file);
-          break;
-        case 'mainContentRecovery':
-          setMainContentRecoveryFile(uploadFile.file);
-          break;
+        }
       }
     });
 
@@ -436,33 +514,30 @@ export const TemptationDetails = () => {
     setUploadPreferredContentType(null);
   };
 
-  const handleRemoveImage = (imageId: string) => {
-    setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
-  };
 
   return (
     <div className="bg-neutral-950 min-h-screen">
       {/* Header with Back Button, Title, and Action Buttons */}
-      <div className="flex items-center justify-between px-8 pt-9">
-        <div className="flex items-center gap-8">
+      <div className="flex flex-col gap-4 px-4 pt-6 sm:px-8 sm:pt-9 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 lg:gap-8">
           <button
             onClick={handleBack}
-            className="flex items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
+            className="flex w-fit shrink-0 items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
             style={{ fontFamily: 'Roboto, sans-serif' }}
           >
             <ChevronLeftIcon width={24} height={24} color="#965cdf" />
             <span>Back</span>
           </button>
           <h1
-            className="text-white text-[24px] leading-[normal]"
+            className="min-w-0 text-white text-[20px] leading-tight sm:text-[24px]"
             style={{ fontFamily: 'Cinzel, serif', fontWeight: 400 }}
           >
             Content Details
           </h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
           <Button
-            className="w-[120px] h-[56px]"
+            className="h-[56px] w-full sm:w-[120px]"
             onClick={isEditing ? handleSave : handleEdit}
             disabled={
               isSaving ||
@@ -473,7 +548,7 @@ export const TemptationDetails = () => {
             {isSaving ? `Saving... ${saveProgress}%` : isEditing ? 'Save' : 'Edit'}
           </Button>
           {isSaving && saveProgress > 0 && saveProgress < 100 && (
-            <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+            <div className="h-[4px] w-full max-w-[240px] rounded-full bg-[rgba(255,255,255,0.1)] overflow-hidden sm:w-[200px]">
               <div
                 className="bg-[#965cdf] h-full transition-all duration-300"
                 style={{ width: `${saveProgress}%` }}
@@ -482,7 +557,7 @@ export const TemptationDetails = () => {
           )}
           <Button
             variant="outline"
-            className="w-[120px] h-[56px]"
+            className="h-[56px] w-full sm:w-[120px]"
             onClick={handleDelete}
             disabled={isSaving || isDeleting || !temptationData?.id}
           >
@@ -492,14 +567,14 @@ export const TemptationDetails = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="px-8 pt-9 pb-8">
-        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8">
-          <div className="flex gap-16 items-start mb-16 relative">
+      <div className="px-4 pt-6 pb-6 sm:px-8 sm:pt-9 sm:pb-8">
+        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] sm:rounded-[24px] p-4 sm:p-8">
+          <div className="relative mb-10 flex flex-col gap-10 xl:mb-16 xl:flex-row xl:items-start xl:gap-16">
             {/* Left Column - Form Fields */}
-            <div className="flex-1 flex flex-col gap-10">
+            <div className="flex min-w-0 flex-1 flex-col gap-10">
               {/* Content Title and Upload Files Button */}
-              <div className="flex items-end justify-between gap-4">
-                <div className="flex-1">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-col gap-2">
                     <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
                       Title
@@ -509,18 +584,17 @@ export const TemptationDetails = () => {
                       onChange={(e) => setContentTitle(e.target.value)}
                       placeholder="Enter content title"
                       disabled={!isEditing}
-                      className="w-full bg-transparent border-none text-white focus:outline-none placeholder-[#616161] disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full min-w-0 bg-transparent border-none text-[22px] leading-tight text-white focus:outline-none placeholder-[#616161] disabled:opacity-60 disabled:cursor-not-allowed sm:text-[30px] lg:text-[40px]"
                       style={{ 
                         fontFamily: 'Cinzel, serif', 
                         fontWeight: 400,
-                        fontSize: '40px',
                         lineHeight: 'normal'
                       }}
                     />
                   </div>
                 </div>
                 <Button
-                  className="w-[120px] h-[56px]"
+                  className="h-[56px] w-full shrink-0 sm:w-[120px]"
                   onClick={() => handleUploadButtonClick()}
                   disabled={!isEditing}
                 >
@@ -591,38 +665,86 @@ export const TemptationDetails = () => {
                 </div>
               )}
 
-              {/* Question Audio Players */}
-              {(questionAudioFiles.length > 0 || questionAudioUrls.length > 0) && (
+              {/* Recovery question audio */}
+              {(questionRecoveryFiles.length > 0 || questionRecoveryUrls.length > 0) && (
                 <div className="flex flex-col gap-4">
-                  {/* Newly uploaded question audio files */}
-                  {questionAudioFiles.map((file, index) => (
+                  <p
+                    className="text-[#965cdf] text-[12px] leading-[16px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  >
+                    Recovery questions
+                  </p>
+                  {questionRecoveryFiles.map((file, index) => (
                     <AudioPlayer
-                      key={`question-new-${file.name}-${index}`}
-                      label={`Question ${index + 1}`}
+                      key={`question-recovery-new-${file.name}-${index}`}
+                      label={`Recovery question ${index + 1}`}
                       file={file}
                       onRemove={
                         isEditing
                           ? () => {
-                              setQuestionAudioFiles((prev) => {
-                                const newFiles = [...prev];
-                                newFiles.splice(index, 1);
-                                return newFiles;
+                              setQuestionRecoveryFiles((prev) => {
+                                const next = [...prev];
+                                next.splice(index, 1);
+                                return next;
                               });
                             }
                           : undefined
                       }
                     />
                   ))}
-                  {/* Existing question audio URLs */}
-                  {questionAudioUrls.map((url, index) => (
+                  {questionRecoveryUrls.map((url, index) => (
                     <AudioPlayer
-                      key={`question-existing-${index}`}
-                      label={`Question ${questionAudioFiles.length + index + 1}`}
+                      key={`question-recovery-url-${index}`}
+                      label={`Recovery question ${questionRecoveryFiles.length + index + 1}`}
                       url={url}
                       onRemove={
                         isEditing
                           ? () => {
-                              setQuestionAudioUrls((prev) => prev.filter((_, i) => i !== index));
+                              setQuestionRecoveryUrls((prev) => prev.filter((_, i) => i !== index));
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Support question audio */}
+              {(questionSupportFiles.length > 0 || questionSupportUrls.length > 0) && (
+                <div className="flex flex-col gap-4">
+                  <p
+                    className="text-[#965cdf] text-[12px] leading-[16px]"
+                    style={{ fontFamily: 'Roboto, sans-serif' }}
+                  >
+                    Support questions
+                  </p>
+                  {questionSupportFiles.map((file, index) => (
+                    <AudioPlayer
+                      key={`question-support-new-${file.name}-${index}`}
+                      label={`Support question ${index + 1}`}
+                      file={file}
+                      onRemove={
+                        isEditing
+                          ? () => {
+                              setQuestionSupportFiles((prev) => {
+                                const next = [...prev];
+                                next.splice(index, 1);
+                                return next;
+                              });
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
+                  {questionSupportUrls.map((url, index) => (
+                    <AudioPlayer
+                      key={`question-support-url-${index}`}
+                      label={`Support question ${questionSupportFiles.length + index + 1}`}
+                      url={url}
+                      onRemove={
+                        isEditing
+                          ? () => {
+                              setQuestionSupportUrls((prev) => prev.filter((_, i) => i !== index));
                             }
                           : undefined
                       }
@@ -633,88 +755,7 @@ export const TemptationDetails = () => {
             </div>
 
             {/* Right Column - Image and Transcript Upload */}
-            <div className="w-[464px] flex flex-col gap-6">
-              {/* Image Upload Section */}
-              <div className="flex flex-col gap-6">
-                {uploadedImages.length > 0 ? (
-                  <div className="flex flex-col gap-4">
-                    {/* Image Grid - Scrollable container with fixed height */}
-                    <div className="h-[364px] overflow-y-auto pr-2 custom-scrollbar">
-                      {uploadedImages.length === 1 ? (
-                        // Single image - display larger
-                        <div className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] w-full h-full overflow-hidden group">
-                          <img
-                            src={uploadedImages[0].src}
-                            alt="Uploaded content"
-                            className="w-full h-full object-cover"
-                          />
-                          {/* Remove Button */}
-                          <button
-                            onClick={() => handleRemoveImage(uploadedImages[0].id)}
-                            className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label="Remove image"
-                            disabled={!isEditing}
-                          >
-                            <DeleteIcon width={16} height={16} color="#fff" />
-                          </button>
-                        </div>
-                      ) : (
-                        // Multiple images - grid layout
-                        <div className="grid grid-cols-3 gap-3">
-                          {uploadedImages.map((image) => (
-                            <div
-                              key={image.id}
-                              className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] h-[110px] overflow-hidden group"
-                            >
-                              <img
-                                src={image.src}
-                                alt="Uploaded content"
-                                className="w-full h-full object-cover"
-                              />
-                              {/* Remove Button */}
-                              <button
-                                onClick={() => handleRemoveImage(image.id)}
-                                className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                aria-label="Remove image"
-                                disabled={!isEditing}
-                              >
-                                <DeleteIcon width={16} height={16} color="#fff" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      className="w-full h-[56px]"
-                      onClick={() => handleUploadButtonClick()}
-                      disabled={!isEditing}
-                    >
-                      Upload More Images
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <div
-                      className="bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[364px] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#965cdf] transition-colors"
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, 'image')}
-                      onClick={isEditing ? () => handleUploadButtonClick() : undefined}
-                    >
-                      <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
-                        No image uploaded
-                      </div>
-                    </div>
-                    <Button
-                      className="w-full h-[56px]"
-                      onClick={() => handleUploadButtonClick()}
-                      disabled={!isEditing}
-                    >
-                      Upload Files
-                    </Button>
-                  </>
-                )}
-              </div>
+            <div className="flex w-full flex-col gap-6 xl:w-[464px] xl:shrink-0">
 
               {/* In-app transcripts (plain text, shown in mobile app) */}
               <div className="flex flex-col gap-4">
@@ -755,6 +796,114 @@ export const TemptationDetails = () => {
                     style={{ fontFamily: 'Roboto, sans-serif' }}
                   />
                 </div>
+              </div>
+
+              {/* Recovery Images Section */}
+              <div className="flex flex-col gap-4">
+                <label
+                  className="text-white text-[16px] leading-[24px]"
+                  style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
+                >
+                  Recovery Images
+                </label>
+                {recoveryImages.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {recoveryImages.map((image) => (
+                      <div
+                        key={image.id}
+                        className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] h-[110px] overflow-hidden group"
+                      >
+                        <img
+                          src={image.src}
+                          alt="Recovery content"
+                          className="w-full h-full object-cover"
+                        />
+                        {isEditing && (
+                          <button
+                            onClick={() => {
+                              setRecoveryImages((prev) => prev.filter((img) => img.id !== image.id));
+                            }}
+                            className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer"
+                            aria-label="Remove image"
+                          >
+                            <DeleteIcon width={16} height={16} color="#fff" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    className={`bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[120px] flex items-center justify-center ${isEditing ? 'cursor-pointer hover:border-[#965cdf]' : ''} transition-colors`}
+                    onClick={() => isEditing && handleUploadButtonClick('recoveryImage')}
+                  >
+                    <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                      No recovery images uploaded
+                    </div>
+                  </div>
+                )}
+                {isEditing && (
+                  <Button
+                    className="w-full h-[56px]"
+                    onClick={() => handleUploadButtonClick('recoveryImage')}
+                  >
+                    Upload Recovery Images
+                  </Button>
+                )}
+              </div>
+
+              {/* Support Images Section */}
+              <div className="flex flex-col gap-4">
+                <label
+                  className="text-white text-[16px] leading-[24px]"
+                  style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
+                >
+                  Support Images
+                </label>
+                {supportImages.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {supportImages.map((image) => (
+                      <div
+                        key={image.id}
+                        className="relative bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[12px] h-[110px] overflow-hidden group"
+                      >
+                        <img
+                          src={image.src}
+                          alt="Support content"
+                          className="w-full h-full object-cover"
+                        />
+                        {isEditing && (
+                          <button
+                            onClick={() => {
+                              setSupportImages((prev) => prev.filter((img) => img.id !== image.id));
+                            }}
+                            className="absolute top-1.5 right-1.5 w-8 h-8 bg-white/7 backdrop-blur-[20px] rounded-full flex items-center justify-center transition-opacity cursor-pointer"
+                            aria-label="Remove image"
+                          >
+                            <DeleteIcon width={16} height={16} color="#fff" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    className={`bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] h-[120px] flex items-center justify-center ${isEditing ? 'cursor-pointer hover:border-[#965cdf]' : ''} transition-colors`}
+                    onClick={() => isEditing && handleUploadButtonClick('supportImage')}
+                  >
+                    <div className="text-[#8f8f8f] text-[14px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                      No support images uploaded
+                    </div>
+                  </div>
+                )}
+                {isEditing && (
+                  <Button
+                    className="w-full h-[56px]"
+                    onClick={() => handleUploadButtonClick('supportImage')}
+                  >
+                    Upload Support Images
+                  </Button>
+                )}
               </div>
             </div>
           </div>

@@ -1,7 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import CloudUploadIcon from '../assets/icons/cloud-upload';
 import CloseIcon from '../assets/icons/close';
 import { Button } from './Button';
+import { showWarning } from '../lib/notifications';
+import {
+  fileExceedsMaxUpload,
+  formatFileSize,
+  getConfiguredMaxUploadBytes,
+} from '../lib/uploadLimits';
 
 export interface TranscriptFile {
   id: string;
@@ -26,6 +32,7 @@ export const TranscriptUploadModal: React.FC<TranscriptUploadModalProps> = ({
 }) => {
   const [uploadFiles, setUploadFiles] = useState<TranscriptFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputId = useId();
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -75,7 +82,26 @@ export const TranscriptUploadModal: React.FC<TranscriptUploadModalProps> = ({
   };
 
   const addFiles = (files: File[]) => {
-    const newFiles: TranscriptFile[] = files.map((file) => ({
+    const maxUploadBytes = getConfiguredMaxUploadBytes();
+    const accepted: File[] = [];
+    let oversizedCount = 0;
+    for (const file of files) {
+      if (fileExceedsMaxUpload(file, maxUploadBytes)) {
+        oversizedCount++;
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (oversizedCount > 0) {
+      showWarning(
+        `${oversizedCount} file(s) were not added — each must be ${formatFileSize(maxUploadBytes)} or smaller. Use smaller or compressed files, or ask your administrator to raise the upload limit.`
+      );
+    }
+    if (accepted.length === 0) {
+      return;
+    }
+
+    const newFiles: TranscriptFile[] = accepted.map((file) => ({
       id: `${Date.now()}-${Math.random()}-${file.name}`,
       file,
       progress: 0,
@@ -137,12 +163,12 @@ export const TranscriptUploadModal: React.FC<TranscriptUploadModalProps> = ({
           UPLOAD
         </h2>
 
-        {/* Drag & Drop Area */}
-        <div
+        {/* Drag & Drop Area — label opens picker on iPad/iOS Safari (programmatic .click() on display:none inputs is blocked) */}
+        <label
+          htmlFor={fileInputId}
           className="bg-[rgba(150,92,223,0.1)] border border-[#965cdf] border-dashed rounded-[16px] p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition hover:bg-[rgba(150,92,223,0.15)]"
           onDragOver={handleDragOver}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
         >
           <CloudUploadIcon width={48} height={48} color="#fff" />
           <div className="text-center">
@@ -159,15 +185,23 @@ export const TranscriptUploadModal: React.FC<TranscriptUploadModalProps> = ({
             >
               Supported formats: {supportedFormats}
             </p>
+            <p
+              className="text-[#8f8f8f] text-[12px] leading-[16px]"
+              style={{ fontFamily: 'Roboto, sans-serif' }}
+            >
+              Maximum size: {formatFileSize(getConfiguredMaxUploadBytes())} per file
+            </p>
           </div>
-        </div>
+        </label>
         <input
+          id={fileInputId}
           ref={fileInputRef}
           type="file"
           accept={accept}
           multiple
           onChange={handleFileSelect}
-          className="hidden"
+          className="sr-only"
+          tabIndex={-1}
         />
 
         {/* Uploading Files List - Scrollable */}

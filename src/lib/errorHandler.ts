@@ -1,18 +1,36 @@
+/** Shown when the API rejects an upload for exceeding the configured size limit. */
+export const FILE_SIZE_USER_FRIENDLY_MESSAGE =
+  'That file is too large to upload. Try a smaller or compressed file. If you need a higher limit, ask your administrator to increase the maximum upload size.';
+
+/**
+ * Replace low-level storage errors with copy that makes sense for content editors.
+ */
+export function enrichAppwriteMessageForDisplay(message: string): string {
+  const m = message.trim();
+  if (!m) {
+    return m;
+  }
+  const looksLikeFileSizeRejection =
+    /file\s*size|filesize|payload too large|\b413\b/i.test(m) &&
+    /not allowed|exceed|maximum|limit|too large|invalid|bigger than/i.test(m);
+  if (looksLikeFileSizeRejection) {
+    return FILE_SIZE_USER_FRIENDLY_MESSAGE;
+  }
+  return m;
+};
+
 /**
  * Extract error message from Appwrite error
- * Simply returns the message from Appwrite as-is
  */
 export const getAppwriteErrorMessage = (error: unknown): string => {
   if (!error) {
-    return 'An unexpected error occurred';
+    return enrichAppwriteMessageForDisplay('An unexpected error occurred');
   }
 
-  // Handle Error instances
   if (error instanceof Error) {
-    return error.message || 'An error occurred';
+    return enrichAppwriteMessageForDisplay(error.message || 'An error occurred');
   }
 
-  // Handle Appwrite error objects - check multiple possible locations
   if (typeof error === 'object') {
     const appwriteError = error as {
       message?: string;
@@ -27,30 +45,28 @@ export const getAppwriteErrorMessage = (error: unknown): string => {
       };
     };
 
-    // Try to get message from various locations in order of priority
     if (appwriteError.message) {
-      return appwriteError.message;
+      return enrichAppwriteMessageForDisplay(appwriteError.message);
     }
 
     if (appwriteError.response?.message) {
-      return appwriteError.response.message;
+      return enrichAppwriteMessageForDisplay(appwriteError.response.message);
     }
 
     if (appwriteError.response?.data?.message) {
-      return appwriteError.response.data.message;
+      return enrichAppwriteMessageForDisplay(appwriteError.response.data.message);
     }
 
     if (appwriteError.data?.message) {
-      return appwriteError.data.message;
+      return enrichAppwriteMessageForDisplay(appwriteError.data.message);
     }
   }
 
-  // Fallback for string errors
   if (typeof error === 'string') {
-    return error;
+    return enrichAppwriteMessageForDisplay(error);
   }
 
-  return 'An unexpected error occurred';
+  return enrichAppwriteMessageForDisplay('An unexpected error occurred');
 };
 
 /**

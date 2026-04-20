@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { AudioPlayer } from '../components/AudioPlayer';
@@ -7,7 +7,14 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import ChevronLeftIcon from '../assets/icons/chevron-left';
 import PlusIcon from '../assets/icons/plus';
 import CloseIcon from '../assets/icons/close';
-import { deleteContent, publishContent, updateContentWithFiles, fetchContentById, type ContentDocument } from '../lib/content';
+import {
+  deleteContent,
+  publishContent,
+  updateContentWithFiles,
+  fetchContentById,
+  fetchFortyDayJourneyByDay,
+  type ContentDocument,
+} from '../lib/content';
 import { showAppwriteError } from '../lib/notifications';
 
 interface JourneyData {
@@ -43,6 +50,68 @@ export const Journey40Day = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [dayError, setDayError] = useState<string | null>(null);
+  const [dayValidationPending, setDayValidationPending] = useState(false);
+
+  const dayBlocksSubmit = useMemo(() => {
+    if (day === '') return false;
+    return !!dayError || dayValidationPending;
+  }, [day, dayError, dayValidationPending]);
+
+  // Real-time day validation (range + duplicate check)
+  useEffect(() => {
+    if (isEditMode && !isEditing) {
+      setDayError(null);
+      setDayValidationPending(false);
+      return;
+    }
+
+    if (day === '') {
+      setDayError(null);
+      setDayValidationPending(false);
+      return;
+    }
+
+    const dayNum = Number(day);
+    if (!Number.isInteger(dayNum) || dayNum < 1 || dayNum > 40) {
+      setDayError('Day must be a whole number between 1 and 40');
+      setDayValidationPending(false);
+      return;
+    }
+
+    setDayValidationPending(true);
+    let cancelled = false;
+
+    const timer = window.setTimeout(() => {
+      (async () => {
+        try {
+          const existing = await fetchFortyDayJourneyByDay(dayNum, contentId, { silent: true });
+          if (cancelled) return;
+          if (existing) {
+            setDayError(
+              `Day ${dayNum} is already used by "${existing.title?.trim() || 'Untitled'}". Choose a different day.`
+            );
+          } else {
+            setDayError(null);
+          }
+        } catch {
+          if (!cancelled) {
+            setDayError('Could not verify this day. Try again.');
+          }
+        } finally {
+          if (!cancelled) {
+            setDayValidationPending(false);
+          }
+        }
+      })();
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      setDayValidationPending(false);
+    };
+  }, [day, contentId, isEditMode, isEditing]);
 
   // Load data when component mounts or journeyData changes
   useEffect(() => {
@@ -179,6 +248,10 @@ export const Journey40Day = () => {
       return;
     }
 
+    if (dayBlocksSubmit) {
+      return;
+    }
+
     // Filter out empty tasks
     const validTasks = tasks.filter((task) => task.trim().length > 0);
 
@@ -262,6 +335,10 @@ export const Journey40Day = () => {
       console.warn('No tasks provided for the journey');
     }
 
+    if (dayBlocksSubmit) {
+      return;
+    }
+
     setIsPublishing(true);
     setPublishProgress(0);
 
@@ -327,38 +404,39 @@ export const Journey40Day = () => {
   return (
     <div className="bg-neutral-950 min-h-screen">
       {/* Header with Back Button, Title, and Action Buttons */}
-      <div className="flex items-center justify-between px-8 pt-9">
-        <div className="flex items-center gap-8">
+      <div className="flex flex-col gap-4 px-4 pt-6 sm:px-8 sm:pt-9 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 lg:gap-8">
           <button
             onClick={() => navigate('/content-management')}
-            className="flex items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
+            className="flex w-fit shrink-0 items-center gap-2 text-[#965cdf] text-[12px] hover:opacity-80 transition cursor-pointer" 
             style={{ fontFamily: 'Roboto, sans-serif' }}
           >
             <ChevronLeftIcon width={24} height={24} color="#965cdf" />
             <span>Back</span>
           </button>
           <h1
-            className="text-white text-[24px] leading-[normal]"
+            className="min-w-0 text-white text-[20px] leading-tight sm:text-[24px]"
             style={{ fontFamily: 'Cinzel, serif', fontWeight: 400 }}
           >
             {isEditMode ? 'Content Details' : '40 DAY JOURNEY'}
           </h1>
         </div>
         {isEditMode && (
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
             <Button
-              className="w-[120px] h-[56px]"
+              className="h-[56px] w-full sm:w-[120px]"
               onClick={isEditing ? handleSave : handleEdit}
               disabled={
                 isSaving ||
                 !contentId ||
-                (isEditing && !hasUnsavedChanges())
+                (isEditing && !hasUnsavedChanges()) ||
+                (isEditing && dayBlocksSubmit)
               }
             >
               {isSaving ? `Saving... ${saveProgress}%` : isEditing ? 'Save' : 'Edit'}
             </Button>
             {isSaving && saveProgress > 0 && saveProgress < 100 && (
-              <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+              <div className="h-[4px] w-full max-w-[240px] rounded-full bg-[rgba(255,255,255,0.1)] overflow-hidden sm:w-[200px]">
                 <div
                   className="bg-[#965cdf] h-full transition-all duration-300"
                   style={{ width: `${saveProgress}%` }}
@@ -367,7 +445,7 @@ export const Journey40Day = () => {
             )}
             <Button
               variant="outline"
-              className="w-[120px] h-[56px]"
+              className="h-[56px] w-full sm:w-[120px]"
               onClick={handleDelete}
               disabled={isSaving || isDeleting || !contentId}
             >
@@ -378,15 +456,15 @@ export const Journey40Day = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="px-8 pt-9 pb-8">
-        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[24px] p-8 flex flex-col gap-16 items-center">
+      <div className="px-4 pt-6 pb-6 sm:px-8 sm:pt-9 sm:pb-8">
+        <div className="backdrop-blur-[10px] bg-[rgba(255,255,255,0.07)] rounded-[16px] sm:rounded-[24px] p-4 sm:p-8 flex flex-col gap-10 sm:gap-16 items-center">
         {/* Content Section */}
-        <div className="flex gap-16 items-start w-full">
+        <div className="flex w-full flex-col gap-10 xl:flex-row xl:items-start xl:gap-16">
           {/* Left Section - Content Title and Audio */}
-          <div className="flex-1 flex flex-col gap-10 items-end">
+          <div className="flex flex-1 flex-col gap-10 xl:items-end">
             {/* Content Title with Upload Button */}
-            <div className="flex items-end justify-between gap-4 w-full">
-              <div className="flex-1">
+            <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-col gap-2">
                   <label className="text-white text-[14px] leading-[20px]" style={{ fontFamily: 'Roboto, sans-serif' }}>
                     Title
@@ -396,11 +474,10 @@ export const Journey40Day = () => {
                     onChange={(e) => setContentTitle(e.target.value)}
                     placeholder=" "
                     disabled={isEditMode ? !isEditing : false}
-                    className={`w-full ${isEditMode ? 'bg-transparent border-none' : 'h-[56px] bg-[#131313] border border-[#965cdf] rounded-[16px] px-4 focus:ring-2 focus:ring-[#965cdf]'} text-white focus:outline-none placeholder-[#616161] disabled:opacity-60 disabled:cursor-not-allowed`}
+                    className={`w-full min-w-0 ${isEditMode ? 'bg-transparent border-none text-[22px] sm:text-[30px] lg:text-[40px]' : 'h-[56px] bg-[#131313] border border-[#965cdf] rounded-[16px] px-4 text-[18px] sm:text-[20px] focus:ring-2 focus:ring-[#965cdf]'} text-white focus:outline-none placeholder-[#616161] disabled:opacity-60 disabled:cursor-not-allowed`}
                     style={{ 
                       fontFamily: 'Cinzel, serif', 
                       fontWeight: 400,
-                      fontSize: isEditMode ? '40px' : '20px',
                       lineHeight: 'normal'
                     }}
                   />
@@ -408,7 +485,7 @@ export const Journey40Day = () => {
               </div>
               <Button
                 onClick={handleUploadFiles}
-                className="w-[120px] h-[56px]"
+                className="h-[56px] w-full shrink-0 sm:w-[120px]"
                 disabled={isEditMode ? !isEditing : false}
               >
                 Upload Files
@@ -428,8 +505,26 @@ export const Journey40Day = () => {
                 min="1"
                 max="40"
                 disabled={isEditMode ? !isEditing : false}
-                className="h-[56px] bg-[#131313] border border-[rgba(255,255,255,0.25)] rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 focus:ring-[#965cdf]"
+                aria-invalid={!!dayError}
+                aria-describedby={dayError || dayValidationPending ? 'day-field-feedback' : undefined}
+                className={`h-[56px] bg-[#131313] border rounded-[16px] px-4 font-lato text-[16px] leading-[24px] text-white placeholder:text-[#616161] focus:outline-none focus:ring-2 ${
+                  dayError
+                    ? 'border-red-400 focus:ring-red-400/60'
+                    : 'border-[rgba(255,255,255,0.25)] focus:ring-[#965cdf]'
+                }`}
               />
+              <div id="day-field-feedback" className="min-h-[20px]">
+                {dayValidationPending && (
+                  <p className="text-[13px] leading-[20px] text-[#c4b5fd] font-roboto">
+                    Checking day…
+                  </p>
+                )}
+                {dayError && !dayValidationPending && (
+                  <p className="text-[13px] leading-[20px] text-red-400 font-roboto" role="alert">
+                    {dayError}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Audio Players */}
@@ -482,9 +577,9 @@ export const Journey40Day = () => {
           </div>
 
           {/* Right Section - Tasks */}
-          <div className="flex flex-col gap-4 w-[464px]">
+          <div className="flex w-full flex-col gap-4 xl:w-[464px] xl:shrink-0">
             <h3
-              className="text-white text-[16px] leading-[24px] font-cinzel font-bold whitespace-nowrap"
+              className="text-white text-[16px] leading-[24px] font-cinzel font-bold sm:whitespace-nowrap"
               style={{ fontWeight: 550 }}
             >
               Input user tasks below:
@@ -543,23 +638,23 @@ export const Journey40Day = () => {
 
         {/* Action Buttons - Only show for create mode */}
         {!isEditMode && (
-          <div className="flex gap-4 items-center justify-end w-full">
+          <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             <button
               onClick={handleCancel}
               disabled={isPublishing}
-              className="w-[120px] h-[56px] rounded-[12px] border border-[#965cdf] text-white font-roboto font-medium text-[16px] leading-normal hover:bg-[rgba(150,92,223,0.1)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-[56px] w-full rounded-[12px] border border-[#965cdf] text-white font-roboto font-medium text-[16px] leading-normal hover:bg-[rgba(150,92,223,0.1)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:w-[120px]"
             >
               Cancel
             </button>
             <Button
               onClick={handlePublish}
-              className="w-[120px] h-[56px] rounded-[12px]"
-              disabled={isPublishing}
+              className="h-[56px] w-full rounded-[12px] sm:w-[120px]"
+              disabled={isPublishing || dayBlocksSubmit}
             >
               {isPublishing ? `Publishing... ${publishProgress}%` : 'Publish'}
             </Button>
             {isPublishing && publishProgress > 0 && publishProgress < 100 && (
-              <div className="w-[200px] h-[4px] bg-[rgba(255,255,255,0.1)] rounded-full overflow-hidden">
+              <div className="h-[4px] w-full max-w-[240px] rounded-full bg-[rgba(255,255,255,0.1)] overflow-hidden sm:w-[200px]">
                 <div
                   className="bg-[#965cdf] h-full transition-all duration-300"
                   style={{ width: `${publishProgress}%` }}
