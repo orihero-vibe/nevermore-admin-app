@@ -671,7 +671,7 @@ export const Journey40Day = () => {
         isOpen={isUploadPopupOpen}
         onClose={() => setIsUploadPopupOpen(false)}
         onUpload={handleUploadComplete}
-        accept="audio/*"
+        accept="audio/mpeg,audio/wav,audio/x-m4a,audio/m4a,audio/aac,audio/ogg,audio/flac,.mp3,.wav,.m4a,.aac,.ogg,.flac"
         title="Upload Audio"
         supportedFormats="MP3, WAV, M4A, AAC, OGG, FLAC"
         contentTypes={[
